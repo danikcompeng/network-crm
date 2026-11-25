@@ -23,7 +23,8 @@ export type ColorRole =
   | "accent-fill"
   | "on-accent"
   | "accent-tint"
-  | "danger";
+  | "danger"
+  | "danger-fill";
 
 export type Mode = "light" | "dark";
 
@@ -43,6 +44,7 @@ export const PALETTE: Record<Mode, Record<ColorRole, string>> = {
     "on-accent": "#FFFFFF", // text on accent-fill
     "accent-tint": "#E4EBFC", // selected filters, the current tab
     danger: "#B3261E",
+    "danger-fill": "#B3261E", // a Delete button's fill, with white text
   },
   dark: {
     background: "#131518", // graphite, never pure black
@@ -59,6 +61,7 @@ export const PALETTE: Record<Mode, Record<ColorRole, string>> = {
     "on-accent": "#FFFFFF",
     "accent-tint": "#1D2846",
     danger: "#FF8C82",
+    "danger-fill": "#C2372D", // deeper than the text red: a salmon block glares
   },
 };
 
@@ -83,7 +86,7 @@ export const TEXT_PAIRS: readonly [text: ColorRole, on: ColorRole][] = [
   ["on-accent", "accent-fill"], // primary button label
   ["danger", "background"],
   ["danger", "surface"],
-  ["surface", "danger"], // the Delete button: light text on red
+  ["on-accent", "danger-fill"], // the Delete button: white on red
 ];
 
 /** Icons, borders and focus rings, and what they sit on. Each must be 3:1. */
@@ -97,6 +100,7 @@ export const NON_TEXT_PAIRS: readonly [mark: ColorRole, on: ColorRole][] = [
   ["accent-fill", "background"], // a primary button's shape on the page
   ["danger", "surface"], // edge of a text box with an error
   ["danger", "background"], // its focus ring
+  ["danger-fill", "surface"], // a Delete button's shape in a card or sheet
 ];
 
 /** WCAG relative luminance of "#RRGGBB". */

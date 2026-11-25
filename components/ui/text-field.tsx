@@ -32,8 +32,10 @@ export function TextField({ id, label, error, hint, className = "", ref, ...prop
         id={id}
         aria-invalid={error ? true : undefined}
         aria-describedby={[hintId, errorId].filter(Boolean).join(" ") || undefined}
+        // An empty date box shows "mm/dd/yyyy" in some browsers: muted, so it doesn't look filled in.
+        data-empty={props.type === "date" && !props.value ? true : undefined}
         className={
-          "h-12 w-full rounded-(--radius-field) border border-edge bg-surface px-4 text-base text-ink placeholder:text-ink-muted " +
+          "h-12 w-full rounded-(--radius-field) border border-edge bg-surface px-4 text-base text-ink placeholder:text-ink-muted data-empty:text-ink-muted " +
           // Invalid: a 2 px red edge (border + ring, so nothing shifts) and a red
           // focus ring, so a refocused box reads "wrong", not just "focused".
           "aria-invalid:border-danger aria-invalid:ring-1 aria-invalid:ring-danger aria-invalid:focus-visible:outline-danger " +

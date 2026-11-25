@@ -398,7 +398,42 @@ export function needsReseed(metadata: Metadata, now: Date, today: string): boole
   return age > RESEED_AFTER_MS || age < -CLOCK_SLACK_MS;
 }
 
-/** The metadata to write once a seed has finished: its finish time and day. */
-export function seededMarkers(finishedAt: Date, today: string): Record<string, string> {
-  return { [SEEDED_AT_KEY]: finishedAt.toISOString(), [SEEDED_DAY_KEY]: today };
+/**
+ * The database's own clock at the seed (the seeded contacts' updated_at),
+ * so "changed since the seed" compares the database's times with each
+ * other and never with this server's clock.
+ */
+export const SEED_DB_AT_KEY = "crm_demo_seed_db_at";
+
+/** The metadata to write once a seed has finished: its finish time, day, and the database's time of the seed. */
+export function seededMarkers(finishedAt: Date, today: string, seedDbAt?: string | null): Record<string, string> {
+  const markers: Record<string, string> = { [SEEDED_AT_KEY]: finishedAt.toISOString(), [SEEDED_DAY_KEY]: today };
+  if (seedDbAt) markers[SEED_DB_AT_KEY] = seedDbAt;
+  return markers;
+}
+
+/** How many rows a table has, and its newest change (updated_at, or created_at for interactions). */
+export type TableState = { count: number; latest: string | null };
+export type DemoState = { contacts: TableState; interactions: TableState; applications: TableState };
+
+export function seedCounts(payload: SeedPayload): Record<keyof DemoState, number> {
+  return { contacts: payload.contacts.length, interactions: payload.interactions.length, applications: payload.applications.length };
+}
+
+/**
+ * Has a visitor changed the demo since it was seeded? Yes if any table has
+ * a different number of rows than the seed made, or a row created or
+ * edited after the seed (by the database's clock). Then the next demo
+ * sign-in reseeds, so one visitor's deletions don't greet the next.
+ * (Editing an interaction's note keeps its created_at, so that alone isn't
+ * noticed; adding or deleting one is.)
+ */
+export function seedLooksChanged(metadata: Metadata, state: DemoState, expected: Record<keyof DemoState, number>): boolean {
+  const mark = metadata?.[SEED_DB_AT_KEY];
+  const markTime = typeof mark === "string" ? Date.parse(mark) : Number.NaN;
+  if (Number.isNaN(markTime)) return true;
+  return (Object.keys(expected) as (keyof DemoState)[]).some((table) => {
+    const { count, latest } = state[table];
+    return count !== expected[table] || (latest !== null && Date.parse(latest) > markTime);
+  });
 }

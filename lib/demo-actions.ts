@@ -6,8 +6,8 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { logAuthError } from "./auth-log";
-import { demoCredentials, isDemoEmail, seedDemo } from "./demo";
-import { needsReseed } from "./demo-seed";
+import { demoCredentials, demoState, isDemoEmail, seedDemo } from "./demo";
+import { demoSeedPayload, needsReseed, seedCounts, seedLooksChanged } from "./demo-seed";
 import { guarded, requireUser, userTimeZone, userToday } from "./server-helpers";
 import { createClient } from "./supabase/server";
 import type { FormState } from "./types";
@@ -39,7 +39,7 @@ export async function signInDemo(): Promise<FormState> {
     const [today, timeZone] = await Promise.all([userToday(), userTimeZone()]);
     // Metadata straight from the sign-in, not the login token, which can
     // hold an old copy.
-    if (needsReseed(data.user.user_metadata, new Date(), today)) {
+    if (needsReseed(data.user.user_metadata, new Date(), today) || (await demoWasChanged(supabase, data.user.user_metadata, today, timeZone))) {
       try {
         await seedDemo(supabase, data.user, today, timeZone);
       } catch (seedError) {
@@ -70,4 +70,23 @@ export async function resetDemo(): Promise<FormState> {
     refresh();
     return { ok: true };
   });
+}
+
+/**
+ * Did a visitor change the sample network since its last seed? Then this
+ * sign-in reseeds, so the next visitor finds it whole. If the check itself
+ * fails, don't reseed (the hourly rule still will).
+ */
+async function demoWasChanged(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  metadata: Record<string, unknown> | undefined,
+  today: string,
+  timeZone: string | undefined,
+): Promise<boolean> {
+  try {
+    return seedLooksChanged(metadata, await demoState(supabase), seedCounts(demoSeedPayload(today, timeZone)));
+  } catch (error) {
+    console.error("signInDemo: couldn't check the demo:", error);
+    return false;
+  }
 }

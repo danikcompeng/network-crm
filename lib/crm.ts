@@ -63,6 +63,9 @@ export const LIMITS = {
   applicationNotes: 2_000,
 } as const;
 
+/** How many interactions a contact's page shows (the latest). */
+export const TIMELINE_LIMIT = 100;
+
 export function isStage(value: unknown): value is Stage {
   return typeof value === "string" && (STAGES as readonly string[]).includes(value);
 }

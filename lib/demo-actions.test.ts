@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Redirected, fakeCookies, makeFakeSupabase, nextCache, nextHeaders, nextNavigation } from "@/tests/next-mocks";
-import { SEEDED_AT_KEY, SEEDED_DAY_KEY } from "./demo-seed";
+import { Redirected, fakeCookies, fakeTables, makeFakeSupabase, nextCache, nextHeaders, nextNavigation } from "@/tests/next-mocks";
+import { SEED_DB_AT_KEY, SEEDED_AT_KEY, SEEDED_DAY_KEY, demoSeedPayload, seedCounts } from "./demo-seed";
 
 const supabase = makeFakeSupabase();
 vi.mock("./supabase/server", () => ({ createClient: async () => supabase }));
@@ -45,13 +45,30 @@ describe("signInDemo", () => {
     expect(seed.contacts.find((c) => c.name === "Riya Patel")?.next_follow_up).toBe(todayIn("Pacific/Kiritimati"));
   });
 
-  it("doesn't reseed when the sample data is fresh (metadata from the sign-in, not the token)", async () => {
-    const today = todayIn("America/Toronto");
-    const fresh = { [SEEDED_AT_KEY]: new Date().toISOString(), [SEEDED_DAY_KEY]: today };
-    supabase.auth.signInWithPassword.mockResolvedValue({ data: { user: demoUser(fresh) }, error: null });
+  /** The tables exactly as the seed left them, `mark` being the database's time of the seed. */
+  function untouchedDemo(mark: string) {
+    const counts = seedCounts(demoSeedPayload(todayIn("America/Toronto"), "America/Toronto"));
+    fakeTables.crm_contacts = { count: counts.contacts, rows: [{ updated_at: mark }] };
+    fakeTables.crm_interactions = { count: counts.interactions, rows: [{ created_at: "2026-01-01T12:00:00+00:00" }] };
+    fakeTables.crm_applications = { count: counts.applications, rows: [] };
+  }
+  const MARK = "2026-11-24T17:00:00.5+00:00";
+  const freshMarkers = () => ({ [SEEDED_AT_KEY]: new Date().toISOString(), [SEEDED_DAY_KEY]: todayIn("America/Toronto"), [SEED_DB_AT_KEY]: MARK });
+
+  it("doesn't reseed when the sample data is fresh and untouched (metadata from the sign-in, not the token)", async () => {
+    untouchedDemo(MARK);
+    supabase.auth.signInWithPassword.mockResolvedValue({ data: { user: demoUser(freshMarkers()) }, error: null });
     await expect(signInDemo()).rejects.toEqual(new Redirected("/"));
     expect(supabase.rpc).not.toHaveBeenCalled();
     expect(supabase.auth.getClaims).not.toHaveBeenCalled();
+  });
+
+  it("reseeds a fresh demo that a visitor changed (someone deleted), so the next visitor finds it whole", async () => {
+    untouchedDemo(MARK);
+    fakeTables.crm_contacts.count -= 1;
+    supabase.auth.signInWithPassword.mockResolvedValue({ data: { user: demoUser(freshMarkers()) }, error: null });
+    await expect(signInDemo()).rejects.toEqual(new Redirected("/"));
+    expect(supabase.rpc).toHaveBeenCalledWith("reseed_demo_crm", expect.anything());
   });
 
   it("still lets you in when the seed fails", async () => {

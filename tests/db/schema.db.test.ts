@@ -414,3 +414,21 @@ describe("function privileges", () => {
     expect(rows.filter((r) => !r.name.startsWith("crm_") && r.name !== "reseed_demo_crm")).toEqual([]);
   });
 });
+
+describe("the updated_at guard the app relies on", () => {
+  it("updated_at read back as the API sends it matches exactly once, and not after another change", async () => {
+    const ana = await contactAs(USER_A, "Ana");
+    // PostgREST sends timestamptz as JSON text, e.g. "2026-11-24T17:00:00.123456+00:00".
+    const stamp = await asUser(db, USER_A, async (tx) => {
+      const { rows } = await tx.query<{ t: string }>("select to_json(updated_at) #>> '{}' as t from public.crm_contacts where id = $1", [ana]);
+      return rows[0].t;
+    });
+    const save = (role: string) =>
+      asUser(db, USER_A, (tx) =>
+        tx.query("update public.crm_contacts set role = $1 where id = $2 and updated_at = $3::timestamptz", [role, ana, stamp]),
+      );
+    expect((await save("First")).affectedRows).toBe(1);
+    // The touch trigger moved updated_at: the same stamp no longer matches.
+    expect((await save("Second")).affectedRows).toBe(0);
+  });
+});

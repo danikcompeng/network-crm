@@ -42,7 +42,7 @@ async function Home() {
         <NetworkMark size={24} className="text-accent" />
         <span className="text-base font-semibold tracking-tight">{APP_NAME}</span>
         {demo && (
-          <span className="ml-1 rounded-full bg-surface-press px-2.5 py-0.5 text-sm font-medium text-ink-muted">Demo</span>
+          <span className="ml-1 rounded-md bg-surface-press px-2 py-0.5 text-sm font-medium text-ink-muted">Demo</span>
         )}
       </header>
 

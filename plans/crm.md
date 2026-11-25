@@ -327,6 +327,17 @@ replaces it with Today, and Feature 2 adds the tab bar.
   "3 days overdue" in `danger`: it's the one state that asks for action
   today, and the words carry it without the colour.
 - Type sizes: 44 / 30 / 20 / 18 (lead) / 16 / 14; 12 only for map labels.
+- Chips and badges _(design-critic F2 #12)_: something you can tap to
+  filter is a **round pill** (surface, `line-strong` edge; selected:
+  `accent-tint` with a cobalt edge). Something that only says what a
+  thing is (a stage, a status, "Demo") is a **badge**: 6 px corners,
+  `surface-press` fill, no edge. The current tab gets an `accent-tint`
+  pill behind its icon and a semibold label, never colour alone.
+- Danger has two tokens like cobalt: `danger` for words and edges,
+  `danger-fill` (a deeper `#C2372D` in dark) for the Delete button.
+- Field hints sit under their field, muted (the login's "We sent a code
+  to …" above the box is an intro sentence, not a hint). Curly
+  apostrophes and quotes in all copy.
 
 **Tests.** PGlite (`tests/db/`, Hold's Supabase stand-in with the real
 default privileges): RLS for each operation and each table as
@@ -477,6 +488,77 @@ cookies or params sits inside `<Suspense>`. Hidden routes stay alive
 delete confirmation) in a `useLayoutEffect` cleanup, as Hold does.
 Actions call `refresh()`; `redirect()` is called outside any try/catch.
 
+**Decided after the logic check** (these replace the bullets above
+where they disagree):
+- **Add and Edit are dialogs, not routes** _(logic-checker #1, #2, #8)_.
+  Next keeps hidden routes alive under `<Activity>`, so a `/people/new`
+  or `/edit` route would come back holding the last person's values (a
+  duplicate one tap away) or values older than the database (a stale
+  save writing a resolved follow-up back), and `redirect()` pushes
+  history, so Back would land on a dead form. Instead: **Add** opens a
+  full-screen `<dialog>` on the People list (focus trapped, Esc closes),
+  fresh every time it opens; saving goes to the new person with
+  `router.replace`-free history (list → person; Back returns to the
+  list). **Edit** opens the same dialog on the contact's page, filled
+  from the page's current data each time it opens; saving refreshes the
+  page in place (no navigation). Delete lives in the edit dialog;
+  confirming replaces the history entry with the list (`redirect(...,
+  "replace")`), so Back never reaches a deleted person.
+- **Stale saves are refused** _(logic-checker #1)_: the edit sends the
+  `updated_at` it was opened with, and the update only matches that
+  version (`.eq("updated_at", …)`). No match: if the person still
+  exists, "They were changed somewhere else. Close to see the latest";
+  if not, "That person was removed". The payload is built from exactly
+  the nine editable columns (tested), never `id` or `updated_at`.
+- **The tab bar's current tab sits in its own `<Suspense>`**
+  _(logic-checker #3)_: `usePathname` suspends below a dynamic segment
+  with Cache Components; the fallback is the same bar with no current
+  tab, so nothing shifts.
+- **Search and filter never navigate** _(logic-checker #4)_: the
+  address is updated with `window.history.replaceState` (Next keeps
+  `useSearchParams` in sync), filtering stays in the browser.
+- **One `today`** _(logic-checker #5)_: the server's `userToday()` is
+  passed down as a prop and used for every label on the screen. A
+  `DayWatcher` (Hold's, without the hold) refreshes the page when the app
+  returns to the foreground or the device's date changes, so "Today"
+  can't go stale overnight. "Met on" in the Add dialog defaults to that
+  `today` when the dialog opens, and follows it until touched.
+- **Notes count after line ends are normalised** (`\r\n` → `\n`, before
+  trimming and counting), and U+0085 counts as whitespace too
+  _(logic-checker #6, #12)_.
+- **The demo heals itself** _(logic-checker #7)_: a demo sign-in also
+  reseeds when the sample data was changed since the last seed (any
+  contact, interaction or application created or updated after the seed
+  marker, or a count that differs from the seed's). So a visitor who
+  deletes five people leaves the next visitor a whole network, without
+  reseeding on every sign-in. Reset demo stays visible on Home.
+- **Not found** _(logic-checker #9)_: `app/(app)/people/[id]/not-found.tsx`
+  says "This person isn't in your network (maybe they were deleted)"
+  with a way back, inside the tab bar. Tests check the text (a 404 inside
+  a stream keeps status 200).
+- **Folding** covers letters that don't decompose (ł ø ß æ œ đ ð þ ı)
+  _(logic-checker #11)_; the collator and date formats are pinned to
+  English, and sorting happens only in the browser.
+- **Introducer options** read "Name · Company" when there's a company,
+  so two Alexes can't be confused _(logic-checker #12)_.
+- **Error words**: `23514` → "Something in the form isn't allowed";
+  `CR001` → "They're already above this person in the chain, so that
+  would make a loop" (no name: the database doesn't say who)
+  _(logic-checker #13)_.
+- **Rows** show the follow-up if one is set (parked people too: "check
+  back in the spring" is a follow-up), otherwise "Talked 3 days ago" from
+  `crm_contact_stats` (or nothing, never talked). The contact page shows
+  the **whole chain** above the person ("Elena Marsh → Sam Okafor →
+  Riya Patel"), from a loop-safe `chainAbove` in `lib/network.ts`. The
+  timeline is ordered by day, then the time it was logged, newest first
+  _(logic-checker #14)_.
+- **Met on earlier than the introducer's** is allowed (people do meet in
+  odd orders); the map (Feature 5) draws a link once both ends exist
+  _(logic-checker #15)_.
+- **"Deleted Sam Okafor"** arrives as `?deleted=` and the list removes
+  it from the address as soon as it's shown, so a reload doesn't repeat
+  it.
+
 **Tests.** Unit: search (accents, case, word order, empty query),
 counts, ordering, follow-up wording and bucket edges (today − 1, today,
 today + 1, today + 7, today + 8; across a month and year end), day
@@ -489,6 +571,105 @@ search and filter on the demo, add → appears in the list → edit
 with the confirmation → gone; the introducer list leaves out the
 person's own introductees; axe in light and dark on the list, a
 contact, and the form.
+
+### Feature 3: Internship applications
+
+**Goal:** every application in one list, where each stands at a glance,
+status changed in one tap, and the ~55 already in a spreadsheet brought in
+by pasting.
+
+**Tab** "Applications" (between People and Map). **`/applications`**:
+- **Counts at the top**, as three tiles: **Applied** (every application
+  that isn't `saved`: everything you've sent, whatever happened since),
+  **Interviewing** (`online_assessment` + `interviewing`: in process),
+  **Offers** (`offer`). Tapping a tile filters to it.
+- **Status filter** chips (All, Saved, Applied, Online assessment,
+  Interviewing, Offer, Rejected, Withdrawn) with counts, one at a time,
+  kept in the address with `history.replaceState` (as People). A search
+  box (company or role, folded like People's).
+- **Order**: saved first, by deadline (soonest first, no deadline last);
+  then everything else by applied_on, newest first (no date last), ties
+  by company.
+- **Row**: company (bold) and role; status as a word with the same three
+  colour levels as stages (saved / rejected / withdrawn muted, applied /
+  OA ink, interviewing / offer cobalt; never red); "Applied Nov 3" or,
+  for saved, "Deadline Dec 1" (overdue deadlines in `danger` with words:
+  "Deadline passed"); the linked person's name if any; a link button
+  (opens the posting in a new tab, `rel="noopener noreferrer"`, only
+  `http(s)` links ever reach the page: the database refuses others).
+- **Quick status change**: each row has a native `<select>` showing the
+  status (the phone's own picker). Changing it saves at once, guarded by
+  the status the row showed (`.eq("status", shown)`): if it changed
+  elsewhere, nothing is written and the list reloads with "It was
+  changed somewhere else". Leaving `saved` for any other status sets
+  applied_on to today if it was empty (one rule, `lib/applications.ts`).
+  The row says "Saved" / the error in a polite live region.
+- Tapping the row opens the **application sheet** (same `Sheet` as
+  people): company (required, ≤ 80), role (required, ≤ 120), status,
+  applied on, deadline, link (`www.x.com` gets `https://` put in front;
+  anything not http(s) is refused with words), location (≤ 80), person
+  (a native select of your people, "Name · Company", or nobody), notes (≤
+  2,000). Delete inside, with a plain confirmation. Saves are guarded by
+  `updated_at`, like contacts. **Add** opens it empty (status Applied,
+  applied on today).
+- **On a contact's page**, a card "Applications" lists theirs (company,
+  role, status) and each opens the same sheet there. The delete summary
+  already counts them.
+
+**Import** (a sheet from an "Import" button on `/applications`):
+1. A big text box: "Paste rows from a spreadsheet or a CSV file". Tabs
+   (a spreadsheet copy) or commas (CSV), detected from the first line;
+   quotes, doubled quotes, commas and line breaks inside quotes, CRLF, a
+   BOM and blank lines all handled (`lib/import.ts`, pure, RFC 4180 plus
+   tabs).
+2. **Columns**: if the first row looks like headers (company, role /
+   position / title, status / stage, applied / date / applied on, link /
+   url, location, deadline, notes / comments: case and spacing ignored),
+   columns are matched by name; otherwise the order is company, role,
+   applied on, status, link, location. The preview says which.
+3. **Values**: status read generously (submitted → applied; OA,
+   assessment, HackerRank, coding test → online assessment; interview,
+   phone screen, onsite → interviewing; offer → offer; rejected, declined,
+   no → rejected; withdrawn, withdrew → withdrawn; to apply, wishlist,
+   saved → saved; empty → applied; anything else → applied, flagged).
+   Dates: `2026-11-24`, `11/24/2026`, `24/11/2026`, `Nov 24, 2026`, `24
+   Nov 2026`, two-digit years (20xx), and Excel serial numbers. For
+   slashes, **one order for the whole column**: day-first if any row's
+   first number is over 12, month-first if any second number is, else
+   month-first (North American spreadsheets), and the preview says
+   "Dates read as month/day". A column with both kinds is an error on the
+   rows that don't fit. Dates outside 2000–2100 are errors.
+4. **Preview** before anything is saved: "52 to import · 2 already in
+   your list · 1 with a problem", every row with its read values, the
+   problem in words on bad rows. Duplicates (same company + role, folded,
+   already saved or earlier in the paste) and bad rows are skipped and
+   listed. Up to 500 rows per import.
+5. **Import N applications**: the server action checks every row again
+   (it's a public endpoint) and inserts them in **one request** (one
+   statement: all or nothing). Then the list, with "Imported 52
+   applications".
+
+**Demo seed:** 15 applications at the seed's fictional companies, spread
+over every status, some linked to the people there (Kestrel → Riya,
+Northwind → Marcus, Tidewater → Jasmine, Brightline → Omar's offer), a
+couple saved with deadlines (one passed). The reseed function already
+takes applications; the self-healing check counts them.
+
+**Pure modules (tested):** `lib/applications.ts` (counts, order, filter,
+search, the leaving-saved rule, status tones), `lib/application-input.ts`
+(the sheet's checks, link tidying), `lib/import.ts` (parsing, columns,
+statuses, dates, duplicates, the preview summary).
+
+**Tests:** unit for all of the above, including CSV edge cases (quoted
+commas, quoted line breaks, doubled quotes, CRLF, BOM, trailing empty
+lines, a ragged row), each date format and the day/month decision,
+Excel serials, status words, `javascript:` links refused, duplicates
+within the paste and against existing rows; server actions with mocked
+Supabase (invalid rows refused before any insert, the status guard, the
+updated_at guard); Playwright: counts and filters on the demo, a quick
+status change, add / edit / delete, the contact page's card, and a
+paste-import of a small spreadsheet copy (then the demo is put back);
+axe in light and dark.
 
 ## Reviews
 
@@ -559,3 +740,67 @@ Verdict: **Ship after fixes**
 Unreviewed (carried to later features): loading and server-error states
 of the login, the expired-link banner, skeletons, safe areas on a real
 device, the installed app's status bar in dark, motion (none yet).
+
+### Feature 2: Contacts (2026-11-24)
+
+#### logic-checker (plan review)
+Verdict: **Ready after fixes**
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | High | Next keeps hidden routes alive (`<Activity>`), so an edit route would come back with old values and a save would write them over newer data (e.g. bring back a follow-up a log had resolved). | Fixed | Edit is a sheet over the contact page, filled from current data each time it opens; the update only matches the `updated_at` it was opened with, else "changed somewhere else" (e2e test changes the row behind an open sheet). |
+| 2 | High | A preserved `/people/new` would hold the last person's values: one tap from a duplicate. | Fixed | Add is a sheet on the list, fresh each time it opens (e2e checks it's empty after adding). |
+| 3 | Medium | `usePathname` in the layout's tab bar suspends below `/people/[id]` with Cache Components and breaks the build. | Fixed | The marked bar sits in its own Suspense; the fallback is the same bar unmarked. |
+| 4 | Medium | Keeping `?q=` in the address with the router would re-render on the server at every keystroke. | Fixed | `history.replaceState`; filtering stays in the browser. |
+| 5 | Medium | Whose "today" the labels use, and a screen left open overnight; a first visit's UTC "met on" default. | Fixed | One server `today` per render passed down; `DayWatcher` refreshes on foreground and date change; "met on" follows `today` until touched. |
+| 6 | Medium | Browsers may send a textarea's line breaks as CRLF, pushing a note over 4,000. | Fixed | Line ends normalised before counting (tested at the boundary). |
+| 7 | Medium | Any demo visitor can now delete people with one tap; the next visitor (within the hour) sees a broken network. | Fixed | Demo sign-in also reseeds when the data changed since the seed (counts differ, or anything newer than the database's own seed time, kept in the markers). |
+| 8 | Medium | `redirect()` in an action pushes history: Back would reach the edit form, or a deleted person. | Fixed | No edit route; add uses `router.push` from the list; delete redirects with `replace`. |
+| 9 | Low | `notFound()` inside a stream keeps status 200, and there was no not-found page. | Fixed | `people/[id]/not-found.tsx` inside the tab bar; tests check the words. |
+| 10 | Low | Locale-dependent sorting/formatting could differ between server and browser. | Fixed | Collator and formats pinned to English; sorting only in the browser. |
+| 11 | Low | NFD folding misses ł ø ß æ œ… | Fixed | A small table; tested ("lodz" finds "Łódź"). |
+| 12 | Low | Two people with the same name are indistinguishable in the introducer picker. | Fixed | Options read "Name · Company". |
+| 13 | Low | Error mapping gaps (23514; update naming ungranted columns; a CR001 message naming someone the database doesn't name). | Fixed | 23514 mapped; payload built from the nine granted columns (tested); loop message names no one. U+0085 treated as whitespace. |
+| 14 | Low | Plan inconsistencies: "last talked" fetched but unused; chain vs direct introducer; timeline tie order. | Fixed | Rows show "Talked …" when no follow-up; the page shows the whole chain (`chainAbove`, loop-safe); timeline by day then time logged. |
+| 15 | Low | "Met on" earlier than the introducer's. | Accepted | Allowed; the map links people once both exist. |
+
+Open questions answered: the whole chain is shown; rows show the
+follow-up, else when you last talked; parked people keep their
+follow-ups; the demo heals itself when changed; "Deleted …" travels in
+the address and is removed once shown.
+
+#### code-reviewer (diff review)
+Verdict: **Ship after fixes**. Auth on every action, the nine-column payloads, error mapping, RLS and the loop-safe walks all checked fine.
+
+| # | Severity | Finding (file) | Outcome | What changed |
+|---|----------|----------------|---------|--------------|
+| 1 | High | The stale-save guard sent the page's *current* `updated_at`: a refresh while the sheet was open (coming back to the app, or the refusal itself) swapped in the newest stamp, so a second Save wrote old values over new ones. (contact-dialog.tsx) | Fixed | The stamp is captured when the sheet opens and kept in state. The e2e test now presses Save twice after the row changed elsewhere, and both are refused; a PGlite test proves the stamp, read back as the API sends it, matches once and never after another change. |
+| 2 | Medium | Fixed ids (`contact-form`, `contact-<field>`, `sheet-title`) repeat across pages `<Activity>` keeps in the DOM: Save could submit a hidden page's form. (contact-dialog.tsx, sheet.tsx) | Fixed | All ids from `useId()`; the first error is focused through the form's own ref. |
+| 3 | Medium | A successful delete didn't `refresh()`: pages kept in history still showed the deleted person (and the introductions the database had just cleared). (contact-actions.ts) | Fixed | `refresh()` before the replace-redirect (tested, with the redirect type). |
+| 4 | Low | "Deleted …" stayed on the preserved list forever, and its status node mounted already full. | Fixed | Always-mounted status, filled after; cleared in a `useLayoutEffect` cleanup when the list is hidden. |
+| 5 | Low | Sorting runs in client components that also render on the server; Node's and a browser's ICU could order a rare name differently (hydration warning). | Accepted | Collator pinned to `en`, base sensitivity; the plan's "sorting only in the browser" was wrong and is corrected here: the risk is a re-render on a rare name, not wrong data. |
+| 6 | Low | A failed delete said "Couldn't save." | Fixed | Delete has its own words, also for an unexpected failure (tested). |
+| 7 | Low | `?deleted=<anything>` makes the list announce any text. | Fixed | Shown only if nobody by that name is still listed. (Rendered as text, so never markup.) |
+| 8 | Low | Focus was lost after Keep. | Fixed | Focus returns to "Delete …"; opening the confirmation focuses its question, never Delete. |
+| — | Tests | Second stale save, logged-out update/delete, an unreadable stamp, delete's redirect type, 81/281-character fields, odd types, every folded letter, microsecond markers, an added application. | Fixed | All added (379 unit + database tests). |
+
+#### design-critic (people list, person, sheets, not found, empty; light and dark)
+Verdict: **Ship after fixes**
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | High | The current tab was shown by colour alone (cobalt vs muted ~1.2:1 to each other). | Fixed | `accent-tint` pill behind the icon and a semibold label. |
+| 2 | Medium | Dark Delete was a salmon block with dark text, unlike the cobalt Save. | Fixed | `danger-fill` token (`#C2372D` in dark, white text 5.4:1), contrast-tested. |
+| 3 | Medium | During the delete confirmation two button pairs competed, and Delete had autofocus. | Fixed | The sheet footer hides while confirming; focus goes to the question. |
+| 4 | Medium | Rows showed role before company, so truncation cut the company. | Fixed | "Company · Role" on rows and the person page. |
+| 5 | Medium | Follow-up dates in rows weren't labelled; "Today" looked like any date. | Fixed | A bell before follow-ups; overdue red bold, today ink bold, others muted. |
+| 6 | Medium | The chain was small wrapping inline links and stopped before the person. | Fixed | A vertical list of 44 px links joined by a line, ending with the person in ink. |
+| 7 | Low | A scrolled chip sat flush with the screen edge. | Fixed | `scroll-px-5` on the chip row. |
+| 8 | Low | The empty state had two identical primary buttons. | Fixed | The header Add hides while the list is empty. |
+| 9 | Low | Native select padding and arrow didn't line up with text boxes. | Fixed | `appearance-none` and our own chevron at the same inset. |
+| 10 | Low | Textarea resize grip; empty date looked filled. | Fixed | `resize-none`; an empty date box is muted. |
+| 11 | Low | Not-found page centred, full-width button, no back link. | Fixed | Laid out like a person's page, with "‹ People". |
+| 12 | Low | The stage pill looked like a tappable filter chip. | Fixed | Badges have 6 px corners (stage, "Demo"); round pills are only filters. Written into Design direction. |
+| 13 | Low | Straight apostrophes; hint placement differs between fields. | Fixed | Curly quotes; field hints under the field, muted (rule in Design direction). |
+
+Unreviewed (carried): skeletons (still `surface-sunk`), the person page with no follow-up / no notes, "Showing the latest 100", the sheet's server error, pressed states, the wide-screen sheet, iOS native pickers.

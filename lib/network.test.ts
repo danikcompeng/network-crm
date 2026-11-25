@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chainStarts, descendantsOf, introducerChoices, introductions, networkSummary, summaryText, type Link } from "./network";
+import { chainAbove, chainStarts, descendantsOf, introducerChoices, introductions, networkSummary, summaryText, type Link } from "./network";
 
 // A > B > C, A > D; E alone; F introduced by someone not in the list.
 const LINKS: Link[] = [
@@ -35,6 +35,21 @@ describe("descendantsOf", () => {
   it("handles a 1,000-deep chain without recursion limits", () => {
     const deep = Array.from({ length: 1000 }, (_, i) => ({ id: `p${i}`, introducedBy: i === 0 ? null : `p${i - 1}` }));
     expect(descendantsOf(deep, "p0").size).toBe(999);
+  });
+});
+
+describe("chainAbove", () => {
+  it("lists the chain from the top down, empty for someone you met", () => {
+    expect(chainAbove(LINKS, "C")).toEqual(["A", "B"]);
+    expect(chainAbove(LINKS, "A")).toEqual([]);
+    expect(chainAbove(LINKS, "F")).toEqual([]); // introducer not in the list
+  });
+  it("stops at a loop", () => {
+    const loop: Link[] = [
+      { id: "X", introducedBy: "Y" },
+      { id: "Y", introducedBy: "X" },
+    ];
+    expect(chainAbove(loop, "X")).toEqual(["Y"]);
   });
 });
 

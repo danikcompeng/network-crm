@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { demoCredentials, isDemoEmail, seedDemo } from "./demo";
-import { SEEDED_AT_KEY, SEEDED_DAY_KEY } from "./demo-seed";
+import { fakeQuery, fakeTables } from "@/tests/next-mocks";
+import { SEED_DB_AT_KEY, SEEDED_AT_KEY, SEEDED_DAY_KEY } from "./demo-seed";
 
 const DEMO = "demo@example.com";
 
@@ -22,6 +23,10 @@ function fakeSupabase(options: { rpcError?: { message: string; code: string } } 
         calls.push(`updateUser ${data[SEEDED_AT_KEY] === null ? "clear" : "mark"}`);
         return { error: null };
       }),
+    },
+    from: (table: string) => {
+      calls.push(`read ${table}`);
+      return fakeQuery(table);
     },
     rpc: vi.fn(async (name: string) => {
       calls.push(`rpc ${name}`);
@@ -54,9 +59,18 @@ describe("seedDemo", () => {
 
   it("reseeds in one transaction, then marks it done with the finish time and day (one auth call)", async () => {
     const { client, raw, calls } = fakeSupabase();
+    fakeTables.crm_contacts = { count: 20, rows: [{ updated_at: "2026-11-24T17:00:00.5+00:00" }] };
     await seedDemo(client, { email: DEMO }, "2026-11-24", "America/Toronto");
-    expect(calls).toEqual(["rpc reseed_demo_crm", "updateUser mark"]);
-    const marked = raw.auth.updateUser.mock.calls[0][0].data;
+    expect(calls.slice(-5)).toEqual([
+      "rpc reseed_demo_crm",
+      "read crm_contacts",
+      "read crm_interactions",
+      "read crm_applications",
+      "updateUser mark",
+    ]);
+    const marked = raw.auth.updateUser.mock.calls.at(-1)![0].data;
+    // The database's time of the seed, not this server's clock.
+    expect(marked[SEED_DB_AT_KEY]).toBe("2026-11-24T17:00:00.5+00:00");
     expect(marked[SEEDED_DAY_KEY]).toBe("2026-11-24");
     expect(Math.abs(Date.parse(marked[SEEDED_AT_KEY] as string) - Date.now())).toBeLessThan(5_000);
   });

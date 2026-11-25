@@ -6,7 +6,7 @@ import "server-only";
 // this line also makes the build fail if a browser file imports this one.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { demoSeedPayload, seededMarkers } from "./demo-seed";
+import { demoSeedPayload, seededMarkers, type DemoState, type TableState } from "./demo-seed";
 
 /** The demo login, or null if the env vars aren't set (no demo then). */
 export function demoCredentials(): { email: string; password: string } | null {
@@ -46,6 +46,32 @@ export async function seedDemo(
   const { error } = await supabase.rpc("reseed_demo_crm", { p_seed: demoSeedPayload(today, timeZone) });
   if (error) throw new Error(`seedDemo: reseed: ${error.message} (${error.code})`);
 
-  const marked = await supabase.auth.updateUser({ data: seededMarkers(new Date(), today) });
+  // The database's time of the seed: every seeded contact has this updated_at.
+  const state = await demoState(supabase);
+  const marked = await supabase.auth.updateUser({ data: seededMarkers(new Date(), today, state.contacts.latest) });
   if (marked.error) throw new Error(`seedDemo: write markers: ${marked.error.message}`);
+}
+
+/**
+ * Row counts and the newest change in each table, for the account behind
+ * `supabase` (RLS: only its own rows). Three small requests; the newest
+ * change comes back as the first row of a sorted, one-row answer.
+ */
+export async function demoState(supabase: SupabaseClient): Promise<DemoState> {
+  async function table(name: string, column: string): Promise<TableState> {
+    const { data, count, error } = await supabase
+      .from(name)
+      .select(column, { count: "exact" })
+      .order(column, { ascending: false })
+      .limit(1);
+    if (error) throw new Error(`demoState: ${name}: ${error.message} (${error.code})`);
+    const first = (data as unknown as Record<string, string>[] | null)?.[0];
+    return { count: count ?? 0, latest: first?.[column] ?? null };
+  }
+  const [contacts, interactions, applications] = await Promise.all([
+    table("crm_contacts", "updated_at"),
+    table("crm_interactions", "created_at"),
+    table("crm_applications", "updated_at"),
+  ]);
+  return { contacts, interactions, applications };
 }

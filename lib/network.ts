@@ -36,6 +36,24 @@ export function descendantsOf(links: readonly Link[], id: string): Set<string> {
 }
 
 /**
+ * The chain above `id`, from the person you met yourself down to their
+ * direct introducer: [Elena, Sam] for Riya. Stops at a repeat (a loop the
+ * database should never allow) and at anyone missing from `links`.
+ */
+export function chainAbove(links: readonly Link[], id: string): string[] {
+  const introducerOf = new Map(links.map((l) => [l.id, l.introducedBy]));
+  const chain: string[] = [];
+  const seen = new Set([id]);
+  let next = introducerOf.get(id) ?? null;
+  while (next && introducerOf.has(next) && !seen.has(next)) {
+    seen.add(next);
+    chain.unshift(next);
+    next = introducerOf.get(next) ?? null;
+  }
+  return chain;
+}
+
+/**
  * Who can be picked as `id`'s introducer: anyone except them and the
  * people below them (picking one of those would make a loop). With no
  * `id` (a new contact), everyone.

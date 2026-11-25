@@ -97,3 +97,72 @@ export function NetworkMark(props: IconProps) {
     </Icon>
   );
 }
+
+export function HomeIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1Z" />
+    </Icon>
+  );
+}
+
+export function PeopleIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="9" cy="8.5" r="3.25" />
+      <path d="M3.5 19.5c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5" />
+      <circle cx="17" cy="9.5" r="2.5" />
+      <path d="M16.2 14.6c2.3.1 3.9 1.7 4.3 4.4" />
+    </Icon>
+  );
+}
+
+export function BriefcaseIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="7.5" width="17" height="12" rx="2" />
+      <path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5M3.5 12.5h17" />
+    </Icon>
+  );
+}
+
+export function TodayIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="4" y="5.5" width="16" height="14.5" rx="2" />
+      <path d="M8 3.5v4M16 3.5v4M4 10h16" />
+      <path d="M9 14.5l2 2 4-4" />
+    </Icon>
+  );
+}
+
+export function MapIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="2.5" />
+      <circle cx="5" cy="6" r="1.75" />
+      <circle cx="19" cy="6.5" r="1.75" />
+      <circle cx="6" cy="18.5" r="1.75" />
+      <circle cx="18" cy="18" r="1.75" />
+      <path d="M6.4 7.2l3.7 3.2M17.6 7.6l-3.7 3M7.4 17.3l2.8-3.3M16.6 16.8l-2.8-3" />
+    </Icon>
+  );
+}
+
+/** A bell: marks a follow-up date, so it can't be mistaken for another kind of date. */
+export function BellIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 1.5H5Z" />
+      <path d="M10 20.5a2 2 0 0 0 4 0" />
+    </Icon>
+  );
+}
+
+export function ChevronDownIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6 9.5l6 6 6-6" />
+    </Icon>
+  );
+}

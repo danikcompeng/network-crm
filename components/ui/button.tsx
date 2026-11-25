@@ -8,7 +8,7 @@
 
 import type { ButtonHTMLAttributes } from "react";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "danger-quiet";
 export type ButtonOptions = {
   /** "md": 48 px tall, 16 px text (default). "sm": 44 px, 14 px text, for headers and rows. */
   size?: "md" | "sm";
@@ -30,8 +30,10 @@ const VARIANTS: Record<ButtonVariant, string> = {
   // Pressed: the accent at 85% over the page, so the press is visible in both themes.
   primary: "bg-accent-fill text-on-accent active:opacity-85",
   secondary: "border border-edge bg-surface text-ink hover:border-ink-muted active:bg-surface-press",
-  danger: "bg-danger text-surface active:opacity-85",
+  danger: "bg-danger-fill text-on-accent active:opacity-85",
   ghost: "text-ink-muted hover:text-ink active:bg-surface-press active:text-ink",
+  // The first step of a delete: red words, no fill (the confirmation has the fill).
+  "danger-quiet": "text-danger active:bg-surface-press",
 };
 
 export function buttonClass(variant: ButtonVariant = "primary", options: ButtonOptions = {}, extra = ""): string {
@@ -39,7 +41,7 @@ export function buttonClass(variant: ButtonVariant = "primary", options: ButtonO
   return [BASE, SIZES[size], block ? "w-full" : "w-auto", VARIANTS[variant], extra].filter(Boolean).join(" ");
 }
 
-type Props = ButtonHTMLAttributes<HTMLButtonElement> &
+type Props = ButtonHTMLAttributes<HTMLButtonElement> & { ref?: React.Ref<HTMLButtonElement> } &
   ButtonOptions & {
     variant?: ButtonVariant;
     /**
@@ -75,7 +77,7 @@ export function Button({
       onKeyDown={(event) => {
         // A held-down Enter repeats; for a destructive button that would
         // mean "yes" twice. One press, one action.
-        if (variant === "danger" && event.repeat) event.preventDefault();
+        if ((variant === "danger" || variant === "danger-quiet") && event.repeat) event.preventDefault();
         onKeyDown?.(event);
       }}
       className={buttonClass(variant, { size, block }, className)}
