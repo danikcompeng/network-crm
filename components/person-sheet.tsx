@@ -87,7 +87,8 @@ export function PersonSheet({ personId, onClose, onLog, today }: Props) {
     });
   }
 
-  const where = person ? [person.company, person.role].filter(Boolean).join(" · ") : "";
+  // A no-break space before the dot, so a wrapped line never starts with "·".
+  const where = person ? [person.company, person.role].filter(Boolean).join("\u00a0· ") : "";
   const due = person?.next_follow_up ?? null;
 
   return (
@@ -127,11 +128,11 @@ export function PersonSheet({ personId, onClose, onLog, today }: Props) {
       {person && (
         <div className="flex flex-col gap-5">
           <div>
-            {where && <p className="text-lead text-ink-muted">{where}</p>}
+            {where && <p className="line-clamp-2 text-lead text-ink-muted [overflow-wrap:anywhere]">{where}</p>}
             <p className="mt-2 text-sm">
               <StageLabel stage={person.stage} />
             </p>
-            {person.how_met && <p className="mt-1 text-sm text-ink-muted">{person.how_met}</p>}
+            {person.how_met && <p className="mt-1 line-clamp-2 text-sm text-ink-muted [overflow-wrap:anywhere]">{person.how_met}</p>}
           </div>
 
           <section aria-labelledby={`${uid}-follow`} className="rounded-(--radius-card) border border-line-strong bg-surface p-4">
@@ -181,7 +182,11 @@ export function PersonSheet({ personId, onClose, onLog, today }: Props) {
               <h3 id={`${uid}-notes`} className="mb-1 text-sm font-medium text-ink-muted">
                 Notes
               </h3>
-              <p className="rounded-(--radius-card) bg-surface-press p-4 whitespace-pre-line break-words">{person.notes}</p>
+              {/* A quick look: the whole note is on their page. */}
+              <div className="rounded-(--radius-card) bg-surface-press p-4">
+                {/* The clamp sits inside the padding, so a fifth line never peeks out. */}
+                <p className="line-clamp-4 whitespace-pre-line [overflow-wrap:anywhere]">{person.notes}</p>
+              </div>
             </section>
           )}
 
@@ -201,7 +206,7 @@ export function PersonSheet({ personId, onClose, onLog, today }: Props) {
                         {formatDay(entry.day, today)}
                       </time>
                     </p>
-                    {entry.note && <p className="mt-0.5 text-sm break-words text-ink-muted">{entry.note}</p>}
+                    {entry.note && <p className="mt-0.5 line-clamp-2 text-sm text-ink-muted [overflow-wrap:anywhere]">{entry.note}</p>}
                   </li>
                 ))}
               </ol>

@@ -229,8 +229,8 @@ export function ContactDialog({ open, onClose, today, people, contact, deleteInf
         <TextAreaField {...field("notes")} label="Notes (optional)" rows={5} />
 
         {contact && deleteInfo && (
-          <section aria-labelledby="delete-heading" className="mt-6 border-t border-line pt-6">
-            <h3 id="delete-heading" className="sr-only">
+          <section aria-labelledby={`${uid}-delete`} className="mt-6 border-t border-line pt-6">
+            <h3 id={`${uid}-delete`} className="sr-only">
               Delete
             </h3>
             {!confirmingDelete ? (

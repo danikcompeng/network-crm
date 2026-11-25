@@ -14,7 +14,7 @@ export default function PersonNotFound() {
         <ChevronLeftIcon size={20} />
         People
       </Link>
-      <h1 className="mt-2 text-title font-semibold tracking-tight">Not in your network</h1>
+      <h1 tabIndex={-1} className="outline-none mt-2 text-title font-semibold tracking-tight">Not in your network</h1>
       <p className="mt-3 text-lead text-ink-muted">This person isn’t here. Maybe they were deleted, or the link is wrong.</p>
       <Link href="/people" className={buttonClass("secondary", { block: false }, "mt-6 self-start")}>
         Back to People

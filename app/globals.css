@@ -100,6 +100,20 @@
   }
 }
 
+/* The scrim fades in as a sheet rises (::backdrop doesn't inherit the
+   timing variables everywhere, so the values are written out). Closing is
+   instant: plans/crm.md, Feature 6. */
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  dialog[open]::backdrop {
+    animation: scrim-in 250ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+}
+
 /* A sheet sliding up (motion-safe only). */
 @keyframes sheet-up {
   from {
@@ -130,6 +144,9 @@
 
   body {
     font-family: var(--font-sans);
+    /* A word longer than its line (an email address, a pasted link) wraps
+       instead of pushing the page sideways (plans/crm.md, Feature 6). */
+    overflow-wrap: break-word;
   }
 
   /* One focus ring everywhere: cobalt, just outside the element, so it

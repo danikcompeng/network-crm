@@ -29,3 +29,15 @@ Hold (`~/Documents/habit-tracker`) already solved login, Try the demo,
 the `tz` cookie / calendar-day rules, PGlite database tests, Playwright +
 axe setup, PWA icons and the three reviewer agents. Read it and reuse the
 patterns (adapted, not copied blindly).
+
+## Running it
+
+- `npm run dev` serves on 3200. If 3200 is taken (another app's server),
+  run `npx next dev -p 3201` and point Playwright at it with
+  `BASE_URL=http://localhost:3201`; `signInDemo` checks the login heading
+  is this app's, so a stranger on the port fails fast.
+- Screenshots for design-critic come from a production build:
+  `npx next build`, `npx next start -p 3300`, then
+  `BASE_URL=http://localhost:3300 npx playwright test e2e/screens.e2e.ts --project=setup --project=signed-in -g "<name>"`.
+- Every check before a commit: `npx tsc --noEmit && npx eslint`, `npx vitest run`,
+  and the e2e suite (`npx playwright test --grep-invert screens`).

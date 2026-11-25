@@ -84,7 +84,7 @@ export function ApplicationsScreen({ applications, people, today }: Props) {
   return (
     <>
       <header className="flex min-h-12 flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <h1 className="text-title font-semibold tracking-tight">Applications</h1>
+        <h1 tabIndex={-1} className="outline-none text-title font-semibold tracking-tight">Applications</h1>
         {applications.length > 0 && (
           <div className="flex gap-2">
             <Button
@@ -118,11 +118,9 @@ export function ApplicationsScreen({ applications, people, today }: Props) {
       {applications.length === 0 ? (
         <div className="mt-10 flex flex-col items-start gap-4">
           <p className="text-lead text-ink-muted">No applications yet. Paste the rows you already track in a spreadsheet, or add one.</p>
-          <div className="flex flex-wrap gap-3">
-            <Button block={false} onClick={() => setImporting(true)}>
-              Import from a spreadsheet
-            </Button>
-            <Button variant="secondary" block={false} onClick={() => setAdding(true)}>
+          <div className="flex w-full flex-col gap-3">
+            <Button onClick={() => setImporting(true)}>Import from a spreadsheet</Button>
+            <Button variant="secondary" onClick={() => setAdding(true)}>
               <PlusIcon size={18} />
               Add one
             </Button>

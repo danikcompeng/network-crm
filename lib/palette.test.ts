@@ -56,7 +56,10 @@ describe("no mixed colours", () => {
     walk(`${root}app`);
     walk(`${root}components`);
     const roles = Object.keys(PALETTE.light).join("|");
-    const mixed = new RegExp(`\b(?:bg|text|border|ring|outline|fill|stroke|divide|from|to|via)-(?:${roles})/\d+`);
+    const mixed = new RegExp(String.raw`\b(?:bg|text|border|ring|outline|fill|stroke|divide|from|to|via)-(?:${roles})/\d+`);
+    // It can fail: a mixed colour is caught, a plain one isn't.
+    expect(mixed.test('className="bg-ink/50"')).toBe(true);
+    expect(mixed.test('className="bg-ink text-ink-muted"')).toBe(false);
     const offenders = files.filter((f) => mixed.test(readFileSync(f, "utf8")));
     expect(offenders).toEqual([]);
   });

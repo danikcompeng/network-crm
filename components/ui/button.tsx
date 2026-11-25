@@ -16,8 +16,10 @@ export type ButtonOptions = {
   block?: boolean;
 };
 
+// A label that can't fit (an 80-character name in "Delete …") wraps, centred,
+// instead of pushing the page sideways; short labels never wrap in practice.
 const BASE =
-  "inline-flex select-none items-center justify-center gap-2 rounded-(--radius-field) font-semibold whitespace-nowrap " +
+  "inline-flex select-none items-center justify-center gap-2 rounded-(--radius-field) text-center font-semibold [overflow-wrap:anywhere] " +
   "transition-[background-color,color,border-color,opacity] duration-(--motion-fast) ease-(--ease-out) " +
   "aria-disabled:cursor-not-allowed";
 

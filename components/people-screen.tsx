@@ -57,7 +57,7 @@ export function PeopleScreen({ people, today }: { people: ListPerson[]; today: s
   return (
     <>
       <header className="flex min-h-12 items-center justify-between gap-3">
-        <h1 className="text-title font-semibold tracking-tight">People</h1>
+        <h1 tabIndex={-1} className="outline-none text-title font-semibold tracking-tight">People</h1>
         {/* Empty, the Add under the explanation is the one to press. */}
         {people.length > 0 && (
           <Button size="sm" block={false} onClick={() => setAdding(true)}>

@@ -7,11 +7,12 @@
 import { useLayoutEffect, useState } from "react";
 import Link from "next/link";
 import { LogOutButton, ResetDemoButton } from "@/components/account-actions";
-import { ChevronRightIcon } from "@/components/icons";
+import { ContactDialog } from "@/components/contact-dialog";
+import { ChevronRightIcon, PlusIcon } from "@/components/icons";
 import { LogSheet, type LogTarget } from "@/components/log-sheet";
 import { PersonSheet } from "@/components/person-sheet";
 import { StageLabel } from "@/components/stage-chip";
-import { Button, buttonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { TILES, type Tile } from "@/lib/applications";
 import { buildToday, comingUpDay, dueBadge, initials, lastContact, longDay, nextHint, type TodayPerson } from "@/lib/today";
 
@@ -148,7 +149,7 @@ function FollowUpCard({ person: p, today, onOpen, onLog }: { person: TodayPerson
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="font-semibold">{p.name}</span>
+            <span className="line-clamp-2 min-w-0 font-semibold [overflow-wrap:anywhere]">{p.name}</span>
             <span
               className={`rounded-md bg-surface-press px-2 py-0.5 text-sm font-semibold ${badge.overdue ? "text-danger" : "text-ink"}`}
             >
@@ -170,15 +171,26 @@ function FollowUpCard({ person: p, today, onOpen, onLog }: { person: TodayPerson
   );
 }
 
+/** The first screen a new account sees: the same first step as People and Map. */
+function FirstPerson({ today }: { today: string }) {
+  const [adding, setAdding] = useState(false);
+  useLayoutEffect(() => () => setAdding(false), []);
+  return (
+    <div className="mt-8 flex flex-col items-start gap-4">
+      <p className="text-lead text-ink-muted">No one in your network yet. Add the people you meet, and their follow-ups land here.</p>
+      <Button block={false} onClick={() => setAdding(true)}>
+        <PlusIcon size={18} />
+        Add a person
+      </Button>
+      <ContactDialog open={adding} onClose={() => setAdding(false)} today={today} people={[]} />
+    </div>
+  );
+}
+
 function EmptyDay({ view, anyPeople, today }: { view: ReturnType<typeof buildToday>; anyPeople: boolean; today: string }) {
   if (!anyPeople) {
     return (
-      <div className="mt-3 flex flex-col items-start gap-3">
-        <p className="text-ink-muted">No one in your network yet. Add the people you meet, and their follow-ups land here.</p>
-        <Link href="/people" className={buttonClass("secondary", { size: "sm", block: false })}>
-          Go to People
-        </Link>
-      </div>
+      <FirstPerson today={today} />
     );
   }
   if (!view.anyFollowUps) {

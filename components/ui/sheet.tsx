@@ -26,6 +26,27 @@ type Props = {
   compact?: boolean;
 };
 
+/** The heading of the page you're on: hidden pages (<Activity>) keep theirs in the DOM, out of sight. */
+function visibleHeading(): HTMLElement | undefined {
+  return [...document.querySelectorAll<HTMLElement>("main h1")].find((h) => h.checkVisibility());
+}
+
+/**
+ * Focus the heading of the page you're on, once there is one: the page may
+ * be changing under the sheet (it closes as a deleted person's page is
+ * hidden, and the next page is still loading). Waits up to about two
+ * seconds, and never takes focus from something that has it.
+ */
+function focusHeadingSoon(frames = 120) {
+  requestAnimationFrame(() => {
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    const heading = visibleHeading();
+    if (heading) heading.focus();
+    else if (frames > 0) focusHeadingSoon(frames - 1);
+  });
+}
+
 export function Sheet({ open, onClose, title, busy = false, children, footer, compact = false }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const opener = useRef<Element | null>(null);
@@ -48,7 +69,11 @@ export function Sheet({ open, onClose, title, busy = false, children, footer, co
   useEffect(() => {
     const dialog = ref.current;
     return () => {
-      if (dialog?.open) dialog.close();
+      if (!dialog?.open) return;
+      dialog.close();
+      // React doesn't deliver the close event to a hidden page, so the
+      // onClose below never runs: put focus on the next page's heading here.
+      focusHeadingSoon();
     };
   }, []);
 
@@ -65,8 +90,9 @@ export function Sheet({ open, onClose, title, busy = false, children, footer, co
         if (open) onClose();
         const back = opener.current as HTMLElement | null;
         // What opened it may be gone (a deleted row, an empty state that filled up).
-        if (back?.isConnected) back.focus();
-        else document.querySelector<HTMLElement>("main:not([hidden]) h1")?.focus();
+        // (Gone from the DOM, or on a page <Activity> has hidden.)
+        if (back?.isConnected && back.checkVisibility()) back.focus();
+        else focusHeadingSoon();
       }}
       className={
         (compact
@@ -77,9 +103,10 @@ export function Sheet({ open, onClose, title, busy = false, children, footer, co
       }
     >
       <header
-        className={`flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-line px-5 ${compact ? "" : "pt-[env(safe-area-inset-top)]"}`}
+        className={`flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-line px-5 py-2 ${compact ? "" : "pt-[max(0.5rem,env(safe-area-inset-top))]"}`}
       >
-        <h2 id={titleId} className="text-section font-semibold tracking-tight">
+        {/* A long name stops at two lines here (the sheet's own name, read by screen readers, stays whole). */}
+        <h2 id={titleId} className="line-clamp-2 min-w-0 text-section font-semibold tracking-tight [overflow-wrap:anywhere]">
           {title}
         </h2>
         <button

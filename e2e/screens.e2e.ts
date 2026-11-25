@@ -7,7 +7,8 @@
 
 import { expect, test, type Page } from "@playwright/test";
 import { freshDemo } from "./helpers/app";
-import { reseedDemo } from "./helpers/seed";
+import { localToday, reseedDemo } from "./helpers/seed";
+import { stressSeedPayload } from "./helpers/stress-seed";
 
 const SCHEMES = ["light", "dark"] as const;
 
@@ -240,4 +241,81 @@ test("map screens", async ({ page }) => {
   await page.waitForTimeout(1500);
   await page.getByRole("button", { name: "Stop" }).click(); // hold it mid-sweep for both shots
   await shoot(page, folder, "map-playing", { motion: true });
+});
+
+test("polish screens: first use, stress, skip link", async ({ page }) => {
+  test.setTimeout(240_000);
+  const folder = "feature-6";
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await freshDemo(page, "/");
+  const { timeZone, today } = localToday();
+  try {
+    // First use: every screen on an empty account.
+    await reseedDemo({ contacts: [], interactions: [], applications: [] });
+    for (const [path, name] of [
+      ["/", "first-today"],
+      ["/people", "first-people"],
+      ["/applications", "first-applications"],
+      ["/map", "first-map"],
+    ] as const) {
+      await page.goto(path);
+      await expect(page.locator("h1").first()).toBeVisible();
+      await shoot(page, folder, name);
+    }
+
+    // Stress: content at the database's limits.
+    await reseedDemo(stressSeedPayload(today, timeZone));
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1, name: "Today" })).toBeVisible();
+    await shoot(page, folder, "stress-today");
+    await page.getByRole("button", { name: /^Maximiliana/ }).first().click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await shoot(page, folder, "stress-person-sheet");
+    await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+
+    await page.goto("/people");
+    await expect(page.getByRole("link", { name: /^Maximiliana/ })).toBeVisible();
+    await shoot(page, folder, "stress-people");
+    await page.getByRole("link", { name: /^Maximiliana/ }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Maximiliana");
+    await shoot(page, folder, "stress-person");
+    await page.getByRole("heading", { name: /^Timeline/ }).scrollIntoViewIfNeeded();
+    await page.evaluate(() => window.scrollBy(0, 200));
+    await shoot(page, folder, "stress-person-lower");
+    await page.getByRole("button", { name: "Edit" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await shoot(page, folder, "stress-edit");
+    await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
+
+    await page.goto("/people");
+    await page.getByRole("link", { name: /^alexandria/ }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("alexandria");
+    await shoot(page, folder, "stress-unbroken");
+
+    await page.goto("/applications");
+    await expect(page.getByRole("heading", { level: 1, name: "Applications" })).toBeVisible();
+    await shoot(page, folder, "stress-applications");
+    await page.getByRole("button", { name: /^International Consolidated/ }).first().click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await shoot(page, folder, "stress-application-sheet");
+    await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
+
+    await page.goto("/map");
+    await expect(page.locator("svg [data-node]")).toHaveCount(28);
+    await shoot(page, folder, "stress-map");
+    await page.evaluate(() => {
+      const top = document.getElementById("network-list")!.getBoundingClientRect().top;
+      window.scrollTo(0, window.scrollY + top + 900);
+    });
+    await shoot(page, folder, "stress-map-list");
+  } finally {
+    await reseedDemo();
+  }
+
+  // The skip link, focused.
+  await page.goto("/people");
+  await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
+  await shoot(page, folder, "skip-link");
 });

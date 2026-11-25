@@ -48,6 +48,8 @@ const TAP_REACH = 22;
 const YOU_RADIUS = 18;
 /** Room kept on the right when fitting, for the zoom buttons. */
 const CONTROLS_INSET = 56;
+/** The zoom buttons' column: three 44 px buttons, 8 px apart, 8 px from the top, plus a margin. */
+const CONTROLS_HEIGHT = 8 + 3 * 44 + 2 * 8 + 8;
 const EASE_MS = 600;
 const LABEL_HEIGHT = 14;
 
@@ -372,6 +374,22 @@ function MapFrame({ graph, visible, selected, onSelect, summary }: FrameProps) {
           return { id: n.id, x: p.x * k - r, y: p.y * k - r, width: 2 * r, height: 2 * r };
         }),
     ];
+    // The frame's edges and the zoom buttons block labels too, so a label
+    // never hangs off the map or sits under a button (label space is
+    // screen px around You; the view's offset turns it into the frame's).
+    if (size) {
+      const { tx, ty } = committed;
+      const edge = 4;
+      const far = 1e6;
+      const [left, top, right, bottom] = [-tx + edge, -ty + edge, size.w - tx - edge, size.h - ty - edge];
+      dotBoxes.push(
+        { id: "frame", x: left - far, y: -far, width: far, height: 2 * far },
+        { id: "frame", x: right, y: -far, width: far, height: 2 * far },
+        { id: "frame", x: -far, y: top - far, width: 2 * far, height: far },
+        { id: "frame", x: -far, y: bottom, width: 2 * far, height: far },
+        { id: "frame", x: size.w - CONTROLS_INSET - tx, y: -ty, width: CONTROLS_INSET, height: CONTROLS_HEIGHT },
+      );
+    }
     return placeLabels(
       candidates.map((n) => {
         const p = layout.positions.get(n.id)!;
@@ -380,7 +398,7 @@ function MapFrame({ graph, visible, selected, onSelect, summary }: FrameProps) {
       }),
       dotBoxes,
     );
-  }, [layout, graph, k, selected, visible]);
+  }, [layout, graph, k, committed, size, selected, visible]);
 
   const zoomBy = (factor: number) => {
     if (!size) return;

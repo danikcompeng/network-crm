@@ -20,17 +20,19 @@ export function SelectField({ id, label, error, hint, className = "", ref, child
   const hintId = hint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   return (
-    <div className="flex flex-col gap-2">
+    // min-w-0 all the way down: a select is as wide as its longest option
+    // (an 80-character name) unless something stops it.
+    <div className="flex min-w-0 flex-col gap-2">
       <label htmlFor={id} className="text-sm font-medium text-ink-muted">
         {label}
       </label>
-      <div className="relative">
+      <div className="relative min-w-0">
         <select
           ref={ref}
           id={id}
           aria-invalid={error ? true : undefined}
           aria-describedby={[hintId, errorId].filter(Boolean).join(" ") || undefined}
-          className={`h-12 appearance-none pr-11 ${FIELD_CLASS} ${className}`}
+          className={`h-12 w-full min-w-0 appearance-none truncate pr-11 ${FIELD_CLASS} ${className}`}
           {...props}
         >
           {children}

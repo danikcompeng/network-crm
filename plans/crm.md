@@ -988,6 +988,145 @@ chains; tapping a dot opens the person sheet; the slider at an early date
 shows fewer dots; with Reduce Motion the layout is final at once; axe in
 light and dark.
 
+### Feature 6: Install and polish
+
+**Goal:** it installs like an app on an iPhone and an Android phone, every
+screen has all its states, motion is one consistent system, and an
+accessibility sweep covers every screen and sheet.
+
+**Install** (Hold's pattern, adapted):
+- `lib/app-identity.ts` gains the icon: the **network mark** already used
+  for the tab icon (`app/icon.svg`: three ringed contacts joined to a solid
+  centre, white on cobalt) as data in a 0 0 100 100 box (`NETWORK_MARK`),
+  `markGeometry(shape)` for the three shapes (rounded for browsers and
+  Android "any", full-bleed for iPhone, maskable with the mark scaled to
+  stay inside Android's 40% safe circle), `APP_ICONS` (192, 512,
+  maskable 512, apple-touch 180), `ICON_VERSION = 1` pinned next to the
+  geometry by a test, `iconUrl`, and `appManifest()`: `id: "/"`, name and
+  short name, `start_url: "/"` (Today, or Log in), `scope: "/"`,
+  `display: "standalone"`, background and theme colours from the palette,
+  **no orientation lock** (WCAG 1.3.4).
+- `components/app-icon.tsx` draws it for `next/og` (inline styles, no
+  fonts); `app/icons/[file]/route.tsx` serves the four PNGs (drawn at
+  build time, any other name a 404); `app/manifest.ts`; the layout links
+  `icon-192.png` and `apple-touch-icon.png` (versioned) and the old
+  `app/icon.svg` goes, so there's one icon everywhere.
+- `proxy.ts` lets `/icons/` and `/manifest.webmanifest` through without a
+  login (phones fetch them without the cookie).
+- **No service worker, no offline mode**: everything lives in Supabase and
+  a stale offline copy of your follow-ups would mislead; Chrome and Safari
+  install without one. Losing the connection already shows each screen's
+  error state.
+
+**Every state** (a table per screen in the review: loading, empty, first
+use, error, long content):
+- An unknown address gets `app/not-found.tsx` ("Nothing here" and a way to
+  Today), not Next's default page.
+- An error inside the app keeps the tab bar: `app/(app)/error.tsx`, the
+  same calm message and Try again.
+- Loading: each page already streams behind a skeleton; the review checks
+  each one has the loaded page's shape (no jump when content arrives).
+- First use: the four empty states (Today, People, Applications, Map)
+  are captured together on an empty account and read as one voice.
+- Long content: a stress seed (a 60-character name, a long company and
+  role, 200 interactions, a long note, 6 levels of introductions) is
+  captured on every screen and sheet: everything truncates or wraps, no
+  overflow sideways at 390 or 320 px.
+
+**Motion pass:** one system, the tokens already in `globals.css`
+(`--motion-fast` 150 ms for colour, `--motion-base` 200 ms for small
+changes, `--motion-sheet` 250 ms, `--ease-out`):
+- **Sheets** get an entrance and an exit: the bottom sheet slides up, the
+  full sheet fades and rises 8 px, the scrim fades; CSS only
+  (`@starting-style`, `transition-behavior: allow-discrete` on `display`
+  and `overlay`), so nothing waits on JavaScript and closing is never
+  delayed for a screen reader.
+- The toast fades and rises in.
+- **Reduce Motion**: nothing moves; changes are instant or a plain fade.
+  A test lists every `transition-*`/`animate-*` class in the components and
+  checks motion other than colour and opacity sits behind `motion-safe:`
+  or a reduce-motion rule.
+
+**Accessibility pass** (`e2e/a11y.e2e.ts`):
+- axe on every route **and every sheet** (add and edit person, the log
+  sheet, the person sheet, an application, import, delete confirmations),
+  light and dark.
+- Reflow: every screen at 320 px wide with no sideways scroll.
+- Targets: every button, link, select and input on each screen is at
+  least 44 × 44 px (inline links in running text excepted), measured.
+- Keyboard: a **Skip to content** link first; Tab from the top reaches the
+  tab bar and each screen's main controls in order, with focus visible;
+  every sheet traps focus and returns it.
+- One `h1` per page and a unique `<title>` per route (tested).
+
+**Docs:** README: what it is, screenshots, installing on iPhone and
+Android, running it, the reviewers. CLAUDE.md: e2e on port 3201 and
+screenshots from a production build on 3300 (3200 is Hold's).
+
+**Name:** the working name "Network" stays until the user picks one;
+renaming is `APP_NAME` plus an `ICON_VERSION` bump only if the mark
+changes.
+
+**Decided after the logic check** (these replace the bullets above
+where they disagree; no migration is needed):
+- **Sheets close instantly; only the entrance moves** _(logic-checker #1)_.
+  An exit transition on `<dialog>` loses the modal position the moment
+  `close()` runs, Safari and Firefox drop the scrim at once (no `overlay`
+  transition), and a closing sheet still takes taps (a double log). The
+  existing entrance stays (the sheet rises 24 px and fades in, behind
+  `motion-safe:`); the scrim fades in with it. Closing is instant in every
+  browser, with or without Reduce Motion.
+- **Skip to content** targets the one `(app)` wrapper (`id="content"`,
+  `tabIndex={-1}`), not a page's `<main>` (hidden `<Activity>` pages keep
+  theirs in the DOM). The sheet's focus fallback picks the **visible**
+  page's h1 (`checkVisibility()`), and every page's h1 takes
+  `tabIndex={-1}` so it can be focused _(#2)_.
+- **Targets: the effective target is measured**: the element or its
+  `<label>`, whichever is bigger; anything that isn't visible
+  (`checkVisibility()`: a hidden page, a closed dialog) is skipped; the
+  skip link is measured while focused; inline links inside running text
+  (a sentence with a link in it) are the one exception _(#3)_.
+- **The motion rule, exactly** _(#4)_: motion means a transition or
+  animation of `transform`, `translate`, `scale`, `rotate`, top/left or
+  size, or bare `transition` / `transition-all` (which include them). Every
+  such class in `app/` and `components/`, and every such rule in
+  `globals.css`, sits behind `motion-safe:` or `prefers-reduced-motion`,
+  except a named allowlist for motion guarded in JavaScript (the map's
+  first ease, gated by `useReducedMotion`). Colour and opacity transitions
+  are fine. The regexes are regex literals; the palette test's
+  "no mixed colours" regex, which could never fail (`\b` in a template
+  string), is fixed the same way.
+- **Ports stay as they are** _(#5)_: 3200 is Network's port (package.json,
+  the e2e default, the login link fallback, Supabase's redirect list).
+  CLAUDE.md says how to point e2e and screenshots elsewhere with
+  `BASE_URL` when 3200 is taken.
+- **Offline, honestly** _(#6)_: no service worker; data already on screen
+  stays; a save says it couldn't save; going to a screen that isn't loaded
+  yet shows the browser's offline page. Documented in the README, not
+  tested.
+- **The in-app error boundary is checked by review, not e2e** _(#7)_: the
+  data is fetched on the server, so Playwright can't make it fail, and no
+  test-only throw goes into production code.
+- The maskable safe zone is measured to the rings' outer edge (centre +
+  radius + half the stroke), scale 0.8 _(#8)_.
+- **The stress seed uses the database's limits** _(#9)_: an 80-character
+  name, an 80-character role, a 120-character application role, a
+  1,000-character interaction note, a 4,000-character contact note, a
+  2,000-character link, and one unbroken token (an email address with no
+  spaces) in a name and a note; the samples are restored in `finally`.
+- **Test details** _(#10)_: count only visible h1s; check `document.title`;
+  in a sheet, Tab never lands on the page behind it (not "wraps"); the
+  expected order is skip link, then the screen, then the tab bar (DOM
+  order); the delete confirmation's heading id comes from `useId`.
+- The manifest's background colour is the light paper (it can't follow
+  dark mode); accepted.
+
+**Tests:** unit for the icon geometry (every point of the maskable mark
+inside the safe circle; the version pinned to the geometry), the manifest,
+and the motion rule; e2e for install (manifest and icons served without a
+login, the right link tags), the accessibility sweep, not-found and the
+in-app error boundary.
+
 ## Reviews
 
 _One entry per feature. Every agent finding is logged with its severity
@@ -1321,3 +1460,58 @@ Verdict: **Ship after fixes**.
 Also fixed while testing: Next's development badge sat over the Today tab once there were four tabs (`devIndicators: false`; development only).
 
 Unreviewed (carried): "Laying out…", "No one on this day yet.", more than 40 people, the skeleton, the ease on a real phone.
+
+### Feature 6: Install and polish (2026-11-25)
+
+#### logic-checker (plan review)
+Verdict: **Ready after fixes**. No migration needed: the stress and empty seeds load through `reseed_demo_crm` within its limits.
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | High | A CSS exit on `<dialog>` loses its modal position when `close()` runs, Safari and Firefox drop the scrim at once, and a closing sheet still takes taps (a double log). | Fixed (changed plan) | Sheets close instantly everywhere; only the entrance moves (the sheet rises, the scrim fades in, behind Reduce Motion). |
+| 2 | Medium | The skip link and the sheet's focus fallback would hit a hidden `<Activity>` page's `<main>`/h1; most h1s couldn't take focus. | Fixed | The skip link targets the one `(app)` wrapper; the fallback picks the visible h1; every h1 has `tabIndex={-1}`. |
+| 3 | Medium | The 44 px target test needed rules (sr-only radios, a checkbox in a big label, hidden pages, the skip link). | Fixed | Effective target = element or its label; invisible things skipped; the skip link measured focused; links in a sentence excepted. A planted 20 px button proves it can fail. |
+| 4 | Medium | The motion test was undefined, and the palette test's regex could never fail (`\b` in a template string). | Fixed | The rule is exact (which properties count; globals.css too; a named allowlist), with self-checks; the palette regex uses `String.raw`, with a self-check. |
+| 5 | Medium | Moving ports contradicted Feature 1 (3200 is in package.json, the e2e default, the login link fallback, Supabase's redirect list). | Fixed (changed plan) | 3200 stays; CLAUDE.md and the README say how to use `BASE_URL` when it's taken. |
+| 6 | Medium | "Losing the connection shows each screen's error state" isn't true for navigation. | Fixed (changed plan) | The README says what happens offline (the browser's offline page for a screen not loaded yet). |
+| 7 | Low | The in-app error boundary can't be triggered from Playwright. | Accepted | Checked by code review; no test-only throw in production code. |
+| 8 | Low | The maskable safe zone must be measured to the rings' outer edge. | Fixed | `markReach` adds radius and half the stroke; scale 0.8 (reach 38.4 of 40), tested. |
+| 9 | Low | The stress seed missed the real limits and an unbroken token. | Fixed | Every limit at its maximum, an email-address name with nothing to break at, also in a note; samples restored in `finally`. |
+| 10 | Low | Test details: visible h1s only, `document.title`, focus never on the page behind (not "wraps"), DOM order, a fixed `delete-heading` id. | Fixed | All as listed; the delete heading's id comes from `useId`. |
+
+#### code-reviewer
+Verdict: **Ship after fixes**.
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | Medium | The sheet's focus fallback never ran for an opener on a page `<Activity>` hid (it's still connected). | Fixed | It also checks the opener is visible. Testing it showed more: React doesn't deliver the close event to a hidden page, and the next page may still be loading; the sheet's hide cleanup now waits (up to ~2 s) for a visible heading and focuses it unless something else has focus. e2e: delete a person from their page → People's heading is focused. |
+| 2 | Medium | The motion rule missed variants with digits, brackets or slashes (`2xl:`, `data-[open]:`, `group-hover/row:`). | Fixed | Any variant up to a colon; those three are in the self-check. |
+| 3 | Medium | The CSS check skipped a block's last declaration without `;`. | Fixed | Checked at `}`; in the self-check. |
+| 4 | Medium | The sheet sweep missed the edit-application sheet and its delete confirmation. | Fixed | Both swept (axe in both themes, 44 px). |
+| 5 | Medium | The keyboard test didn't check focus return or that the tab bar follows the screen; the trap loop couldn't fail. | Fixed | Cancel returns focus to Add; Tab from the screen's last control lands in the tab bar; the fallback test above. |
+| 6 | Low | The person page's title could be read before the client navigation updated it. | Fixed | Waits for `Person · …`; also counts visible h1s there. |
+| 7 | Low | The stress note was ~3,949 characters, and the unbroken token wasn't in a note. | Fixed | Exactly 4,000, with the token in it. |
+| 8 | Low | A stale comment labelled the scrim keyframes as the sheet's. | Fixed | Moved. |
+| — | Tests | Palette regex self-check, sideways overflow on long content at 320 and 390, skip link width. | Fixed | Added. The overflow test found four real overflows (below). |
+
+Found by the new long-content test (fixed): a 629 px-wide page at 320 px from the "Delete {name}" button (buttons couldn't wrap: now they wrap long labels, centred), a link to a person named with one unbroken token, the "None linked to {name}." line, and the "Introduced by" select sizing to its longest option. Long words now wrap app-wide (`overflow-wrap: break-word` on the body, `anywhere` where flex or grid sizing needs it).
+
+#### design-critic (first use, stress content, skip link; light and dark)
+Verdict: **Ship after fixes**.
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | High | Long titles crushed the sheet header (up to 5 lines) and touched its edge. | Fixed | Header padding; the title stops at two lines (the dialog's accessible name stays whole). Titles keep the person's name. |
+| 2 | Medium | The person sheet printed everything. | Fixed | Company · role and how-met at 2 lines, notes at 4, entries at 2; the whole text is on their page. |
+| 3 | Medium | A 6-line headline on the person page. | Fixed | Names over 40 characters step down to the section size, balanced. |
+| 4 | Medium | The timeline didn't fold long notes. | Fixed | Notes over 320 characters fold to 6 lines with Show all / Show less. |
+| 5 | Medium | Today's first use was weaker than People's and Map's. | Fixed | Same copy size and a primary "Add a person" that opens the add sheet on Today. |
+| 6 | Medium | Map labels were cut by the frame's edge or hidden under the Fit button. | Fixed | The frame's edges and the zoom buttons block labels like dots do, so labels move to a clear spot. |
+| 7 | Medium | The skip link half-covered the title. | Fixed | A full-width bar over the whole header, its focus ring inside. |
+| 8 | Low | Names that could still push sideways (Today card, chain). | Fixed | They wrap anywhere and clamp at two lines on the card; the seed's token has no hyphens now. |
+| 9 | Low | Applications' two first-step buttons wrapped at different widths. | Fixed | Stacked, full width. |
+| 10 | Low | A wrapped line could start with "·". | Fixed | A no-break space before the dot. |
+| 11 | Low | The in-app error page didn't match the tab screens. | Fixed | Laid out like them, the button sized to its label. |
+| 12 | Low | The maskable mark reaches 38.4 of the 40 safe radius; the full icon's mark is large. | Accepted | Inside Android's safe zone by spec (the circle mask has 10 more to the edge); the mark is the old tab icon's size. |
+
+Unreviewed (carried): the log sheet with a long name, the 120-character role row in the Applications list, levels 5–6 of a deep chain, the rendered error and not-found pages, skeletons, the sheet entrance on a real phone, the icons on a real home screen.

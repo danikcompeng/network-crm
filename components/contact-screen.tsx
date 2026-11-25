@@ -45,18 +45,25 @@ export function ContactScreen({ data, today }: { data: ContactPageData; today: s
   const byId = new Map(people.map((p) => [p.id, p]));
   const chain = chainAbove(links, contact.id).map((id) => byId.get(id)!);
   const introduced = (introductions(links).get(contact.id) ?? []).map((id) => byId.get(id)!).sort(byName);
-  const where = [contact.company, contact.role].filter(Boolean).join(" · ");
+  // A no-break space before the dot, so a wrapped line never starts with "·".
+  const where = [contact.company, contact.role].filter(Boolean).join("\u00a0· ");
 
   return (
     <>
       <header className="mt-2">
         <div className="flex items-start justify-between gap-3">
-          <h1 className="min-w-0 text-title font-semibold tracking-tight break-words">{contact.name}</h1>
+          {/* A very long name steps down a size, so the page's actions stay near the top. */}
+          <h1
+            tabIndex={-1}
+            className={`min-w-0 font-semibold tracking-tight text-balance outline-none [overflow-wrap:anywhere] ${contact.name.length > 40 ? "text-section" : "text-title"}`}
+          >
+            {contact.name}
+          </h1>
           <Button variant="secondary" size="sm" block={false} onClick={() => setEditing(true)}>
             Edit
           </Button>
         </div>
-        {where && <p className="mt-2 text-lead text-ink-muted">{where}</p>}
+        {where && <p className="mt-2 text-lead text-ink-muted [overflow-wrap:anywhere]">{where}</p>}
         <div className="mt-3">
           <StageChip stage={contact.stage} />
         </div>
@@ -91,7 +98,7 @@ export function ContactScreen({ data, today }: { data: ContactPageData; today: s
                 ))}
                 <li className="relative flex min-h-11 items-center pl-5 before:absolute before:top-0 before:h-1/2 before:left-[5px] before:w-px before:bg-edge">
                   <span aria-hidden="true" className="absolute top-1/2 left-0 size-3 -translate-y-1/2 rounded-full bg-accent" />
-                  <span className="font-semibold">{contact.name}</span>
+                  <span className="min-w-0 font-semibold [overflow-wrap:anywhere]">{contact.name}</span>
                 </li>
               </ol>
             </>
@@ -118,7 +125,7 @@ export function ContactScreen({ data, today }: { data: ContactPageData; today: s
 
         <Card title="Applications">
           {applications.length === 0 ? (
-            <p className="text-ink-muted">None linked to {contact.name}.</p>
+            <p className="text-ink-muted [overflow-wrap:anywhere]">None linked to {contact.name}.</p>
           ) : (
             <ul className="-mx-4 -mb-1">
               {[...applications].sort(applicationOrder(today)).map((a) => (
@@ -137,7 +144,7 @@ export function ContactScreen({ data, today }: { data: ContactPageData; today: s
         {contact.notes && (
           <Card title="Notes">
             {/* Plain text: nothing in a note can run as HTML. */}
-            <p className="whitespace-pre-line break-words">{contact.notes}</p>
+            <p className="whitespace-pre-line [overflow-wrap:anywhere]">{contact.notes}</p>
           </Card>
         )}
 
@@ -208,7 +215,7 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
   return (
     <div className="flex gap-3">
       <dt className="w-24 shrink-0 text-ink-muted">{label}</dt>
-      <dd className="min-w-0 break-words">{children}</dd>
+      <dd className="min-w-0 [overflow-wrap:anywhere]">{children}</dd>
     </div>
   );
 }
@@ -230,8 +237,8 @@ function PersonLink({ id, name, block = false }: { id: string; name: string; blo
       href={`/people/${id}`}
       className={
         block
-          ? "-mx-2 flex min-h-11 items-center rounded-(--radius-field) px-2 font-medium text-accent active:bg-surface-press"
-          : "font-medium text-accent"
+          ? "-mx-2 flex min-h-11 min-w-0 items-center rounded-(--radius-field) px-2 font-medium text-accent [overflow-wrap:anywhere] active:bg-surface-press"
+          : "font-medium text-accent [overflow-wrap:anywhere]"
       }
     >
       {name}
@@ -244,7 +251,11 @@ function PersonLink({ id, name, block = false }: { id: string; name: string; blo
  * would bring back a follow-up it had resolved (the database's rule: only
  * if they have no follow-up now, and nothing later resolved it too).
  */
+/** A note longer than this folds to 6 lines, with Show all. */
+const LONG_NOTE = 320;
+
 function TimelineItem({ entry, today, contactHasFollowUp }: { entry: TimelineEntry; today: string; contactHasFollowUp: boolean }) {
+  const [showAll, setShowAll] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -278,7 +289,16 @@ function TimelineItem({ entry, today, contactHasFollowUp }: { entry: TimelineEnt
           {formatDay(entry.day, today)}
         </time>
       </p>
-      {entry.note && <p className="mt-1 break-words">{entry.note}</p>}
+      {entry.note && (
+        <>
+          <p className={`mt-1 whitespace-pre-line [overflow-wrap:anywhere] ${entry.note.length > LONG_NOTE && !showAll ? "line-clamp-6" : ""}`}>{entry.note}</p>
+          {entry.note.length > LONG_NOTE && (
+            <Button variant="link" size="sm" block={false} className="-ml-3" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll}>
+              {showAll ? "Show less" : "Show all"}
+            </Button>
+          )}
+        </>
+      )}
       {!confirming ? (
         <Button ref={deleteRef} variant="ghost" size="sm" block={false} className="-ml-3 mt-1" onClick={() => setConfirming(true)}>
           Delete<span className="sr-only"> this {label} from {formatDay(entry.day, today)}</span>
