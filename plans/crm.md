@@ -1929,3 +1929,8 @@ Verdict: **Ship after fixes**, then a re-check.
 | C | Low | (Re-check) sparse outer rings push the edge out. | Fixed | The 0.45 unit step for rings of one or two. |
 
 Unreviewed (carried): live drift and label changes during it, the eases and scale-ins, the focused label after the sheet closes, a real iPhone's frame rate, more than 28 people in 3D.
+
+**Production checks** against https://orbit-dk.vercel.app, after the
+deploy of 5174cc7: all 11 pass. Live screenshots of the 3D map at
+390 × 844 @3x, light and dark, no console errors:
+`docs/screenshots/feature-7/live-map-{light,dark}.png`.
