@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Network
 
-## Getting Started
+A personal CRM for an internship search: the people you meet, who
+introduced you to whom, what you talked about, when to follow up, and
+every application, with a map of your network at the centre.
 
-First, run the development server:
+Mobile-first. Next.js 16 · React 19 · Tailwind 4 · Supabase · Vitest +
+PGlite · Playwright + axe. The plan, every decision and the review log
+are in [`plans/crm.md`](plans/crm.md).
+
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev          # http://localhost:3200 (not 3000: Hold and Bitewise live there)
+npm test             # unit tests and real-Postgres (PGlite) database tests
+npm run test:e2e     # Playwright on the shared demo account
+npm run screens      # screenshots for the design review (docs/screenshots/)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`.env.local` (and the Vercel project) needs four values, shared with
+Hold and Bitewise:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Name | What |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | the Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the publishable (anon) key; RLS limits what it can do |
+| `DEMO_EMAIL`, `DEMO_PASSWORD` | the shared demo account behind "Try the demo" (server-only) |
 
-## Learn More
+No service-role key is used anywhere.
 
-To learn more about Next.js, take a look at the following resources:
+## Supabase setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Paste each file in `supabase/migrations/` into the SQL editor, in name
+   order, once. Never edit one that's applied; add a new file.
+2. Authentication → URL Configuration → Redirect URLs: add
+   `http://localhost:3200/auth/confirm` and the deployed
+   `https://<domain>/auth/confirm` (exact addresses, no wildcards).
