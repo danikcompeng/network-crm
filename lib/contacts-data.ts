@@ -33,7 +33,14 @@ export async function loadPeople(supabase: SupabaseClient): Promise<ListPerson[]
   return (people.data as PersonRow[]).map((p) => ({ ...p, last_day: lastDay.get(p.id) ?? null }));
 }
 
-export type TimelineEntry = { id: string; day: string; kind: InteractionKind; note: string | null };
+export type TimelineEntry = {
+  id: string;
+  day: string;
+  kind: InteractionKind;
+  note: string | null;
+  /** The follow-up this interaction resolved (deleting it may bring it back). */
+  cleared_follow_up: string | null;
+};
 
 export type ContactPageData = {
   contact: EditableContact;
@@ -56,7 +63,7 @@ export async function loadContact(supabase: SupabaseClient, id: string): Promise
     supabase.from("crm_contacts").select("id, name, company, introduced_by").limit(1000),
     supabase
       .from("crm_interactions")
-      .select("id, day, kind, note")
+      .select("id, day, kind, note, cleared_follow_up")
       .eq("contact_id", id)
       .order("day", { ascending: false })
       .order("created_at", { ascending: false })

@@ -866,6 +866,77 @@ her back as due today; the person sheet; logging from a person's page
 and deleting a timeline entry; a stale follow-up set refused; axe in
 light and dark.
 
+### Feature 5: The network map
+
+**Goal:** the signature screen. Every person is a dot, lines show who
+introduced you to whom, you're in the middle, and you can watch it grow.
+
+**Tab** "Map" (the fourth tab). **`/map`**:
+- **One request** for everyone (`id, name, company, stage, introduced_by,
+  met_on, created_at`; at most 1,000) plus `crm_contact_stats()` for
+  interaction counts.
+- **The graph** (`lib/map-graph.ts`, pure, tested): a "You" node; an
+  edge from each introducer to the people they introduced; an edge from
+  You to everyone with no introducer (or an introducer that isn't in the
+  list). Loop-safe (a loop the database should never allow can't hang or
+  drop anyone: every walk keeps a visited set).
+- **Layout** with d3-force, computed **in the browser only** (never during
+  server render: no hydration mismatch): links (short), many-body
+  repulsion, collision by radius, You pinned at the centre. **Same layout
+  every visit** for the same data: starting positions come from the tree
+  (each person placed around their introducer by a fixed order), and the
+  simulation's random source is seeded. The layout is computed by running
+  the simulation to rest off-screen (300 ticks); with motion allowed, the
+  dots then ease from their starting spots to the settled ones in 600 ms;
+  **with Reduce Motion, the settled layout appears at once**.
+- **Dots**: size from interaction count on a square-root scale, 8 to 22
+  px radius, capped at 30 interactions so one heavy contact can't dwarf
+  the rest. **Stage by shape and colour** (the same shapes as the lists:
+  new ○, reached out ◔, talking ●, interviewing ◆, offer ★, parked –;
+  colour levels muted / ink / cobalt). "You" is a larger cobalt dot
+  labelled "You". Edges in `edge` (3:1 against the page).
+- **Labels**: first names under each dot (12 px, the one place 12 px is
+  used), with a halo in the page colour so lines don't cross the text;
+  shown for everyone up to 40 people, beyond that only when zoomed in
+  (scale ≥ 1.6) or for the dot you tapped.
+- **Tap a dot** → the same person sheet as Today (follow-up, notes, latest
+  5, Their page, Log interaction).
+- **Pan and zoom**: one finger drags, two fingers pinch, a mouse wheel
+  zooms at the pointer; buttons Zoom in, Zoom out and Fit (44 px). Zoom is
+  limited to 0.4×–4×; the maths is pure (`lib/map-view.ts`, tested).
+  A drag never counts as a tap on a dot.
+- **Watch it grow**: a slider "Your network on: [date]" from the first
+  meeting to today (people appear by `met_on`, or the day they were added
+  if it's missing; a line appears once both ends are there), and a
+  **Play** button that sweeps it over 4 seconds. With Reduce Motion, Play
+  is replaced by the slider alone (it moves in steps you choose). The
+  slider is a native range input with the date as its value text.
+- **The same network as a list**, under the map, for screen readers and
+  anyone who prefers it: "You met directly" and, nested under each
+  person, who they introduced (links to their pages), with each person's
+  stage word. The map's SVG is `role="img"` with a summary ("Network map:
+  20 people in 3 introduction chains. The same network is listed below.");
+  its dots aren't tab stops (300 of them would be a trap), the list is the
+  keyboard way in.
+- **Empty**: nobody yet → "Your map starts with you" and a link to People;
+  only people met directly → the map still draws (a star around You).
+- **Performance**: 300 people must lay out in under a second on a
+  mid-range phone; above 400, the simulation runs in chunks between frames
+  so the page never freezes.
+
+**Pure modules (tested):** `lib/map-graph.ts` (nodes, edges, radius,
+label rule, growth by date, the grouped list, deterministic starting
+positions), `lib/map-view.ts` (pan, zoom about a point, clamping, fit to
+bounds, tap vs drag), and a seeded random source.
+
+**Tests:** unit for all of the above (including a loop, a missing
+introducer, 0 / 1 / 200 interactions, the growth date edges, zoom
+clamping and fit); a layout determinism test (same data → same positions);
+Playwright: the map draws 21 dots (20 + You) and the list shows the three
+chains; tapping a dot opens the person sheet; the slider at an early date
+shows fewer dots; with Reduce Motion the layout is final at once; axe in
+light and dark.
+
 ## Reviews
 
 _One entry per feature. Every agent finding is logged with its severity
@@ -1066,3 +1137,70 @@ Verdict: **Ship after fixes**
 | 13 | Low | The unchecked checkbox looked disabled in dark. | Fixed | A drawn checkbox (`edge` border, cobalt when checked). |
 | 14 | Low | The person card had an extra divider under its title. | Fixed | Removed. |
 | 15 | Low | Empty-state copy vs button order; two Northwind sheets titled alike; header overflow at 320 px. | Fixed | Copy reordered; sheets titled by role; header wraps. |
+
+### Feature 4: Interactions, follow-ups and Today (2026-11-24)
+
+#### logic-checker (plan review)
+Verdict: **Ready after fixes**. No migration needed: every write is already granted and both functions exist and are tested.
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | High | Undo after "Set follow-up" wouldn't bring the old follow-up back (the database restores only when none is set), so Undo didn't undo the sheet. | Fixed | Undo first puts the follow-up back to its value right after the log (guarded on it still being what the sheet set), then deletes the log; e2e: set, Undo → due today again. |
+| 2 | High | A sheet inside a card disappears when logging clears the follow-up and the card leaves "Follow up". | Fixed | Both sheets belong to the Today screen; the person sheet loads its own data; e2e checks the offer survives Riya leaving the list. |
+| 3 | High | `setFollowUp` with expected = null needs `is null`, and a refused update must be detected. | Fixed | `is`/`eq` by case, `.select("id")` length, changed vs gone in words (tested). |
+| 4 | Medium | The sheet can't know "the value after the log" or the logged day from the screen. | Fixed | `logInteraction` returns the day used, the server's today and a fresh read of the follow-up; the offer uses only those. |
+| 5 | Medium | "Add a note or another day" would send the screen's (yesterday's) day at midnight. | Fixed | A day is sent only if changed; otherwise the server's today at the tap. |
+| 6 | Medium | A back-dated log's suggestion could fall before today. | Fixed | Its day + 7, or today + 7 if that's past (tested). |
+| 7 | Medium | No way to clear or move a follow-up without a fake log. | Fixed | Change / Clear it in the person sheet (guarded); parked cards show their stage. |
+| 8 | Medium | A double tap logs twice. | Fixed | All kind buttons wait while one is saving. |
+| 9 | Medium | A tile link might not change a kept-alive Applications page's filter. | Fixed | Applications follows its `status` param; e2e covers it. |
+| 10 | Low | How the person sheet gets its data. | Fixed | Per person on open, latest 5 by day then time logged; Coming-up rows open it too. |
+| 11 | Low | Deleting an old timeline entry can silently bring back a follow-up. | Fixed | The confirmation says so when it may. |
+| 12 | Low | Words that duplicate helpers ("Overdue · 9 days" vs "9 days overdue"). | Fixed | One set of words (`followUpLabel`); a future last-contact day reads as today. |
+| 13 | Low | Error mapping and note checks. | Fixed | P0002, 54000, 23514 in words; notes tidied and counted after line ends are normalised. |
+| 14 | Low | Kept-alive pages keep the sheet's result. | Fixed | The sheets reset whenever they open for someone. |
+
+Open questions answered: Undo reverts both the log and the follow-up it set; a back-dated log suggests a week after it, never in the past; Clear/Change in the person sheet; parked cards show "Parked"; Coming-up rows open the person sheet; "Next: …" only when nothing is due or coming up.
+
+#### code-reviewer (diff review)
+Verdict: **Ship after fixes**. The `setFollowUp` guard, the day the server uses, the sheets owned by the screen, per-person loading with cancellation, and the RPC privileges all checked fine.
+
+| # | Severity | Finding (file) | Outcome | What changed |
+|---|----------|----------------|---------|--------------|
+| 1 | High | Clearing the offer's date box and pressing Set / Move it cleared the follow-up (`""` read as null), then crashed rendering an invalid date. (log-sheet.tsx) | Fixed | Only an explicit `null` clears ("Clear it"); `""` is refused by the action ("Pick a day") and by the sheet before sending (tested). |
+| 2 | Medium | Two-step Undo: step 1 committed, step 2 failed → no refresh, and the sheet still said "Next follow-up: Dec 1". | Fixed | `refresh()` once the revert matched; the failure carries `reverted`, and the sheet drops back to the offer (tested). |
+| 3 | Medium | The "Logged …" status mounted full; the tapped button vanished and focus dropped. | Fixed | One always-mounted status filled after; focus moves to "Logged …". |
+| 4 | Medium | Timeline delete repeated Feature 2's lost focus. | Fixed | Keep → back to Delete; after a delete → the Timeline heading. |
+| 5 | Medium | Applications took `status` from a tile link but kept a stale search. | Fixed | A new status from the address brings its search with it. |
+| 6 | Low | After a refusal the person sheet kept its stale follow-up, so every retry was refused. | Fixed | On "changed", it reloads. |
+| 7 | Low | Save with an emptied date cleared the follow-up. | Fixed | Refused: "Pick a day, or use Clear it." |
+| 8 | Low | "Dec 9 · Dec 9" for a later follow-up. | Fixed | The date is added only when the label isn't already it. |
+| 9 | Low | A failed load left "Loading…" with no retry. | Fixed | "Couldn’t load" with Try again. |
+| 10 | Low | A hidden note or day still rode along. | Fixed | Hiding them clears them. |
+| 11 | Low | When the remaining follow-up equals the suggested day, the offer said "Move it" to the same day. | Fixed | No move offered then (tested). |
+| 12 | Low | "It was already deleted." could never be seen. | Fixed | Dropped (the refresh shows it). |
+| 13 | Low | `initials` cut flags and joined emoji. | Fixed | `Intl.Segmenter` graphemes (tested with 🇨🇦 and 👩‍💻). |
+| 14 | Low | The person page didn't reset its log sheet when hidden. | Fixed | Same cleanup as Today. |
+| — | Tests | Revert edge cases, null-clears, gone person, error words, a chosen day and tidied note reaching the RPC, the offer's edges. | Fixed | Added (503 unit + database tests). |
+| — | Plan | `lib/log-offer.ts` was planned; the offer lives in `lib/interaction-input.ts`. | Noted | As built. |
+
+#### design-critic (Today, sheets, after-log, empty; light and dark; against the Tempo mock)
+Verdict: **Ship after fixes**. Matches the mock's structure; overdue as danger words on a neutral badge and 12 px button corners kept on purpose.
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | High | After a log, two cobalt buttons competed and Done skipped the offer unnoticed. | Fixed | Done is secondary while the offer is open; Set follow-up is the one fill. |
+| 2 | Medium | The sheets were full-screen (the mock has a bottom sheet over Today); the kinds sat far from the thumb. | Fixed | `Sheet compact`: content-sized, from the bottom, over the dimmed page, for the log and person sheets. |
+| 3 | Medium | A stray "·" led its own line in the person sheet. | Fixed | How you met on its own line. |
+| 4 | Medium | Cards said Role · Company (against Feature 2's rule). | Fixed | Company · Role. |
+| 5 | Medium | The tiles were as loud as the title. | Fixed | One quiet strip, 20 px numbers, muted when all zero. |
+| 6 | Medium | A tapped kind gave no sign until the server answered. | Fixed | It turns "Logging…" (a new `selected` variant). |
+| 7 | Medium | A cobalt Delete under every timeline entry. | Fixed | Ghost (muted); the confirmation keeps the red fill. |
+| 8 | Medium | Note and day sat below the kinds ("tap what it was, above"). | Fixed | They come first; the lead says the chosen day. |
+| 9 | Low | The Today badge was cobalt. | Fixed | Ink bold on the quiet fill. |
+| 10 | Low | The offer was labelled twice; the date read as 12/01/2026. | Fixed | The question is the field's label, with "Tue, Dec 1 · in a week" under it; the sheet is titled with the person's name. |
+| 11 | Low | Uneven padding in the follow-up card; no kind icons. | Fixed / Deferred | Padding fixed; icons deferred to the polish pass. |
+| 12 | Low | The footer could touch the last card. | Fixed | A spacer keeps at least 48 px. |
+| 13 | Low | Coming-up rows gave no cue they open something. | Fixed | A chevron. |
+
+Unreviewed (carried): the "Move it" offer, the person sheet with notes and its editor, a parked card, the person page's Log and Delete, error text in sheets, skeletons, long names in sheet titles, iOS date pickers, exit motion.

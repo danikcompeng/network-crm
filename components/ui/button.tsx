@@ -8,7 +8,7 @@
 
 import type { ButtonHTMLAttributes } from "react";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "danger-quiet";
+export type ButtonVariant = "primary" | "secondary" | "selected" | "ghost" | "link" | "danger" | "danger-quiet";
 export type ButtonOptions = {
   /** "md": 48 px tall, 16 px text (default). "sm": 44 px, 14 px text, for headers and rows. */
   size?: "md" | "sm";
@@ -32,6 +32,10 @@ const VARIANTS: Record<ButtonVariant, string> = {
   secondary: "border border-edge bg-surface text-ink hover:border-ink-muted active:bg-surface-press",
   danger: "bg-danger-fill text-on-accent active:opacity-85",
   ghost: "text-ink-muted hover:text-ink active:bg-surface-press active:text-ink",
+  // The one you just tapped, while it's being saved ("Logging…").
+  selected: "border-2 border-accent bg-accent-tint text-accent",
+  // A text action in cobalt, like a link (Change, Set one).
+  link: "text-accent active:bg-surface-press",
   // The first step of a delete: red words, no fill (the confirmation has the fill).
   "danger-quiet": "text-danger active:bg-surface-press",
 };

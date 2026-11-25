@@ -18,9 +18,15 @@ type Props = {
   children: ReactNode;
   /** Pinned to the bottom: the main actions. */
   footer?: ReactNode;
+  /**
+   * On a phone, a sheet as tall as its content, rising from the bottom over
+   * the dimmed page (you keep your place, and its buttons are near the
+   * thumb), instead of the full screen that forms use.
+   */
+  compact?: boolean;
 };
 
-export function Sheet({ open, onClose, title, busy = false, children, footer }: Props) {
+export function Sheet({ open, onClose, title, busy = false, children, footer, compact = false }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const opener = useRef<Element | null>(null);
   // Several sheets can sit on one page (closed dialogs stay in the DOM), so each title has its own id.
@@ -63,12 +69,16 @@ export function Sheet({ open, onClose, title, busy = false, children, footer }: 
         else document.querySelector<HTMLElement>("main:not([hidden]) h1")?.focus();
       }}
       className={
-        "m-0 h-dvh max-h-none w-full max-w-none bg-background p-0 text-ink backdrop:bg-scrim " +
+        (compact
+          ? "top-auto bottom-0 mx-0 mt-auto mb-0 h-auto max-h-[90dvh] w-full max-w-none rounded-t-(--radius-card) border-t border-line-strong bg-background p-0 text-ink backdrop:bg-scrim "
+          : "m-0 h-dvh max-h-none w-full max-w-none bg-background p-0 text-ink backdrop:bg-scrim ") +
         "sm:m-auto sm:h-auto sm:max-h-[90dvh] sm:max-w-lg sm:rounded-(--radius-card) sm:border sm:border-line-strong " +
         "open:flex open:flex-col motion-safe:open:animate-[sheet-up_var(--motion-sheet)_var(--ease-out)]"
       }
     >
-      <header className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-line px-5 pt-[env(safe-area-inset-top)]">
+      <header
+        className={`flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-line px-5 ${compact ? "" : "pt-[env(safe-area-inset-top)]"}`}
+      >
         <h2 id={titleId} className="text-section font-semibold tracking-tight">
           {title}
         </h2>
@@ -82,7 +92,7 @@ export function Sheet({ open, onClose, title, busy = false, children, footer }: 
           <span className="sr-only">Close</span>
         </button>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6">{children}</div>
+      <div className={`min-h-0 flex-1 overflow-y-auto px-5 py-6 ${!footer && compact ? "pb-[max(1.5rem,env(safe-area-inset-bottom))]" : ""}`}>{children}</div>
       {footer && (
         <footer className="shrink-0 border-t border-line bg-background px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">{footer}</footer>
       )}

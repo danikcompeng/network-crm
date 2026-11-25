@@ -7,12 +7,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, type ComponentType, type SVGProps } from "react";
-import { BriefcaseIcon, HomeIcon, PeopleIcon } from "@/components/icons";
+import { BriefcaseIcon, PeopleIcon, TodayIcon } from "@/components/icons";
 
 type Tab = { href: string; label: string; Icon: ComponentType<SVGProps<SVGSVGElement> & { size?: number }> };
 
 export const TABS: readonly Tab[] = [
-  { href: "/", label: "Home", Icon: HomeIcon },
+  { href: "/", label: "Today", Icon: TodayIcon },
   { href: "/people", label: "People", Icon: PeopleIcon },
   { href: "/applications", label: "Applications", Icon: BriefcaseIcon },
 ];

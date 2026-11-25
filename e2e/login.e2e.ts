@@ -41,7 +41,8 @@ test("Try the demo opens the sample network, Reset demo says so, and Log out end
   await reseedDemo();
   await signInDemo(page);
   await expect(page.getByText("Demo account")).toBeVisible();
-  await expect(page.getByText("20 people, 3 introduction chains.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Today" })).toBeVisible();
+  await expect(page.getByText("6 due")).toBeVisible();
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
     await expectNoA11yViolations(page);

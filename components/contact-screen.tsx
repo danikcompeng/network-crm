@@ -5,25 +5,39 @@
 // to, notes, and the timeline. Edit opens the sheet over this page and
 // saving refreshes it in place.
 
-import { useId, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { ApplicationDialog } from "@/components/application-dialog";
 import { ApplicationRowView } from "@/components/applications-screen";
 import { ContactDialog } from "@/components/contact-dialog";
+import { LogSheet } from "@/components/log-sheet";
 import { PlusIcon } from "@/components/icons";
 import { applicationOrder, type ApplicationRow } from "@/lib/applications";
 import { StageChip } from "@/components/stage-chip";
 import { Button } from "@/components/ui/button";
+import { ErrorText } from "@/components/ui/error-text";
 import { INTERACTION_LABELS, TIMELINE_LIMIT } from "@/lib/crm";
-import type { ContactPageData } from "@/lib/contacts-data";
+import type { ContactPageData, TimelineEntry } from "@/lib/contacts-data";
+import { undoInteraction } from "@/lib/interaction-actions";
 import { followUpBucket, followUpLabel } from "@/lib/follow-up";
 import { formatDay } from "@/lib/format";
 import { chainAbove, introductions } from "@/lib/network";
 import { byName } from "@/lib/people";
 
+/** The timeline's heading id: unique, since a person page is one per id and Activity keeps other people's pages. */
+const TIMELINE_HEADING = "person-timeline";
+
 export function ContactScreen({ data, today }: { data: ContactPageData; today: string }) {
   const { contact, people, timeline, interactionCount, applications } = data;
   const [editing, setEditing] = useState(false);
+  const [logging, setLogging] = useState(false);
+  // Hidden pages stay alive: never come back to a sheet left open.
+  useLayoutEffect(
+    () => () => {
+      setLogging(false);
+    },
+    [],
+  );
   const [addingApplication, setAddingApplication] = useState(false);
   const [openApplication, setOpenApplication] = useState<ApplicationRow | null>(null);
 
@@ -45,6 +59,9 @@ export function ContactScreen({ data, today }: { data: ContactPageData; today: s
         {where && <p className="mt-2 text-lead text-ink-muted">{where}</p>}
         <div className="mt-3">
           <StageChip stage={contact.stage} />
+        </div>
+        <div className="mt-4">
+          <Button onClick={() => setLogging(true)}>Log interaction</Button>
         </div>
       </header>
 
@@ -124,7 +141,7 @@ export function ContactScreen({ data, today }: { data: ContactPageData; today: s
           </Card>
         )}
 
-        <Card title="Timeline">
+        <Card title="Timeline" headingId={TIMELINE_HEADING}>
           {timeline.length === 0 ? (
             <p className="text-ink-muted">Nothing logged yet.</p>
           ) : (
@@ -132,13 +149,7 @@ export function ContactScreen({ data, today }: { data: ContactPageData; today: s
               <ol className="flex flex-col">
                 {timeline.map((entry) => (
                   <li key={entry.id} className="border-b border-line py-3 first:pt-0 last:border-b-0 last:pb-0">
-                    <p className="flex items-baseline justify-between gap-3 text-sm">
-                      <span className="font-semibold">{INTERACTION_LABELS[entry.kind]}</span>
-                      <time dateTime={entry.day} className="text-ink-muted tabular-nums">
-                        {formatDay(entry.day, today)}
-                      </time>
-                    </p>
-                    {entry.note && <p className="mt-1 break-words">{entry.note}</p>}
+                    <TimelineItem entry={entry} today={today} contactHasFollowUp={contact.next_follow_up !== null} />
                   </li>
                 ))}
               </ol>
@@ -152,6 +163,7 @@ export function ContactScreen({ data, today }: { data: ContactPageData; today: s
         </Card>
       </div>
 
+      <LogSheet person={logging ? { id: contact.id, name: contact.name } : null} onClose={() => setLogging(false)} today={today} />
       <ApplicationDialog
         open={addingApplication}
         onClose={() => setAddingApplication(false)}
@@ -179,11 +191,12 @@ export function ContactScreen({ data, today }: { data: ContactPageData; today: s
 }
 
 /** A titled card; named by its title, so screen readers can jump between them. */
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  const id = useId();
+function Card({ title, children, headingId }: { title: string; children: React.ReactNode; headingId?: string }) {
+  const generated = useId();
+  const id = headingId ?? generated;
   return (
     <section aria-labelledby={id} className="rounded-(--radius-card) border border-line-strong bg-surface p-4">
-      <h2 id={id} className="mb-2 text-sm font-medium text-ink-muted">
+      <h2 id={id} tabIndex={-1} className="mb-2 text-sm font-medium text-ink-muted outline-none">
         {title}
       </h2>
       {children}
@@ -223,5 +236,74 @@ function PersonLink({ id, name, block = false }: { id: string; name: string; blo
     >
       {name}
     </Link>
+  );
+}
+
+/**
+ * One timeline entry, with Delete. The confirmation says when deleting it
+ * would bring back a follow-up it had resolved (the database's rule: only
+ * if they have no follow-up now, and nothing later resolved it too).
+ */
+function TimelineItem({ entry, today, contactHasFollowUp }: { entry: TimelineEntry; today: string; contactHasFollowUp: boolean }) {
+  const [confirming, setConfirming] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const deleteRef = useRef<HTMLButtonElement>(null);
+  // Keep: focus goes back to Delete, never to the top of the page.
+  const wasConfirming = useRef(false);
+  useEffect(() => {
+    if (!confirming && wasConfirming.current) deleteRef.current?.focus();
+    wasConfirming.current = confirming;
+  }, [confirming]);
+  const label = INTERACTION_LABELS[entry.kind].toLowerCase();
+
+  function remove() {
+    startTransition(async () => {
+      try {
+        const result = await undoInteraction(entry.id);
+        if (!result.ok) return setMessage(result.message);
+        // The entry is about to disappear: focus the timeline's heading, not nothing.
+        document.getElementById(TIMELINE_HEADING)?.focus();
+      } catch {
+        setMessage("Couldn’t delete. Check your connection and try again.");
+      }
+    });
+  }
+
+  return (
+    <>
+      <p className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="font-semibold">{INTERACTION_LABELS[entry.kind]}</span>
+        <time dateTime={entry.day} className="text-ink-muted tabular-nums">
+          {formatDay(entry.day, today)}
+        </time>
+      </p>
+      {entry.note && <p className="mt-1 break-words">{entry.note}</p>}
+      {!confirming ? (
+        <Button ref={deleteRef} variant="ghost" size="sm" block={false} className="-ml-3 mt-1" onClick={() => setConfirming(true)}>
+          Delete<span className="sr-only"> this {label} from {formatDay(entry.day, today)}</span>
+        </Button>
+      ) : (
+        <div role="group" aria-label={`Delete this ${label}?`} className="mt-2 flex flex-col gap-3 rounded-(--radius-field) border border-danger p-3">
+          <p className="text-sm">
+            <span className="font-semibold">
+              Delete this {label} from {formatDay(entry.day, today)}?
+            </span>
+            {entry.cleared_follow_up && !contactHasFollowUp && (
+              <span className="text-ink-muted"> This may bring back the {formatDay(entry.cleared_follow_up, today)} follow-up it resolved.</span>
+            )}
+          </p>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" block={false} onClick={() => setConfirming(false)} busy={pending}>
+              Keep
+            </Button>
+            <Button variant="danger" size="sm" block={false} onClick={remove} busy={pending}>
+              {pending ? "Deleting…" : "Delete"}
+            </Button>
+          </div>
+          {message && <ErrorText>{message}</ErrorText>}
+        </div>
+      )}
+    </>
   );
 }

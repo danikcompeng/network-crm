@@ -48,10 +48,40 @@ test.describe("signed out", () => {
   });
 });
 
-test("home screens", async ({ page }) => {
+test("today screens", async ({ page }) => {
+  const folder = "feature-4";
   await freshDemo(page);
-  await expect(page.getByText("20 people, 3 introduction chains.")).toBeVisible();
-  await shoot(page, "feature-1", "home");
+  await expect(page.getByText("6 due")).toBeVisible();
+  await shoot(page, folder, "today");
+  await shoot(page, folder, "today-full", { fullPage: true });
+
+  await page.getByRole("button", { name: /^Isabel Cruz/ }).click();
+  await expect(page.getByRole("dialog", { name: "Isabel Cruz" }).getByText("9 days overdue", { exact: false })).toBeVisible();
+  await shoot(page, folder, "person-sheet");
+  await page.getByRole("dialog", { name: "Isabel Cruz" }).getByRole("button", { name: "Log interaction" }).click();
+  const log = page.getByRole("dialog", { name: "Log contact with Isabel Cruz" });
+  await expect(log).toBeVisible();
+  await shoot(page, folder, "log");
+  await log.getByRole("button", { name: "Add a note or another day" }).click();
+  await shoot(page, folder, "log-extras");
+  await log.getByRole("button", { name: "Message" }).click();
+  const logged = page.getByRole("dialog", { name: "Isabel Cruz" });
+  await expect(logged.getByRole("status")).toContainText("Logged a message with Isabel Cruz.");
+  await shoot(page, folder, "logged-offer");
+  await logged.getByRole("button", { name: "Set follow-up" }).click();
+  await expect(logged.getByText(/^Next follow-up: /)).toBeVisible();
+  await shoot(page, folder, "logged-set");
+  await logged.getByRole("button", { name: "Undo" }).click();
+  await expect(logged).toBeHidden();
+
+  try {
+    await reseedDemo({ contacts: [], interactions: [], applications: [] });
+    await page.reload();
+    await expect(page.getByText(/No one in your network yet/)).toBeVisible();
+    await shoot(page, folder, "today-empty");
+  } finally {
+    await reseedDemo();
+  }
 });
 
 test("people screens", async ({ page }) => {

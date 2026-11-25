@@ -26,6 +26,16 @@ export function ApplicationsScreen({ applications, people, today }: Props) {
   const params = useSearchParams();
   const [query, setQuery] = useState(() => params.get("q") ?? "");
   const [filter, setFilter] = useState<StatusFilter>(() => parseStatusFilter(params.get("status")));
+  // A link to /applications?status=… (Today's tiles) must change a page
+  // kept alive in the background, not only a fresh one.
+  const statusParam = params.get("status");
+  const [seenStatus, setSeenStatus] = useState(statusParam);
+  if (statusParam !== seenStatus) {
+    setSeenStatus(statusParam);
+    setFilter(parseStatusFilter(statusParam));
+    // A new view arrived (a tile on Today): its search comes with it, never a stale one.
+    setQuery(params.get("q") ?? "");
+  }
   const [editing, setEditing] = useState<ApplicationRow | null>(null);
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
