@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { DEPTH_FADE, LIMB } from "./map-3d";
 import { NON_TEXT_PAIRS, PALETTE, TEXT_PAIRS, contrast, type Mode } from "./palette";
 
 const css = readFileSync(fileURLToPath(new URL("../app/globals.css", import.meta.url)), "utf8");
@@ -28,6 +29,33 @@ describe.each(["light", "dark"] as Mode[])("%s palette", (mode) => {
     const fromCss = cssColors(mode === "light" ? "/* light */" : "/* dark */");
     const expected = Object.fromEntries(Object.entries(colors).map(([k, v]) => [k, v.toUpperCase()]));
     expect(fromCss).toEqual(expected);
+  });
+});
+
+describe("the 3D map's shading keeps the spheres' contrast", () => {
+  // The shader works in linear light: darken the rim, then fade toward the background.
+  const toLinear = (hex: string) =>
+    [1, 3, 5].map((i) => {
+      const v = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    });
+  const toHex = (rgb: number[]) =>
+    "#" +
+    rgb
+      .map((v) => Math.round(255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055)))
+      .map((v) => Math.min(255, Math.max(0, v)).toString(16).padStart(2, "0"))
+      .join("");
+  const mix = (a: number[], b: number[], t: number) => a.map((v, i) => v + (b[i] - v) * t);
+
+  it.each(["light", "dark"] as Mode[])("%s: a faded sphere's rim on the background, and a glyph on a faded sphere, are 3:1", (mode) => {
+    const space = PALETTE[mode].space;
+    for (const role of ["sphere-muted", "sphere-ink", "sphere-accent"] as const) {
+      const base = toLinear(PALETTE[mode][role]);
+      const rim = toHex(mix(base.map((v) => v * LIMB), toLinear(space), DEPTH_FADE));
+      const middle = toHex(mix(base, toLinear(space), DEPTH_FADE));
+      expect(contrast(rim, space), `${role} rim`).toBeGreaterThanOrEqual(3);
+      expect(contrast(space, middle), `${role} glyph`).toBeGreaterThanOrEqual(3);
+    }
   });
 });
 

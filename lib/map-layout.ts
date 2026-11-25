@@ -49,26 +49,40 @@ export function ringRadii(graph: MapGraph): Map<number, number> {
   return radii;
 }
 
-/** The radial tree: each person in the middle of their sector, on their depth's ring. */
-export function radialStart(graph: MapGraph): Map<string, Point> {
-  const start = new Map<string, Point>([[YOU, { x: 0, y: 0 }]]);
-  const depthOf = new Map(graph.nodes.map((n) => [n.id, n.depth]));
-  const radii = ringRadii(graph);
+/**
+ * Each person's sector round You (radians, from the top, clockwise on
+ * screen): You's people share the circle by how many hang below each, and
+ * each person's people share their sector the same way. `angle` is the
+ * sector's middle. Shared by the 2D map and the 3D one.
+ */
+export function sectorAngles(graph: MapGraph): Map<string, { angle: number; from: number; to: number }> {
+  const sectors = new Map<string, { angle: number; from: number; to: number }>();
   const place = (id: string, from: number, to: number) => {
     const kids = graph.children.get(id) ?? [];
     const total = kids.reduce((s, k) => s + (graph.weight.get(k) ?? 1), 0);
     let at = from;
     for (const k of kids) {
       const span = ((to - from) * (graph.weight.get(k) ?? 1)) / Math.max(total, 1);
-      const angle = at + span / 2;
-      const r = radii.get(depthOf.get(k) ?? 1) ?? RING;
-      start.set(k, { x: r * Math.cos(angle), y: r * Math.sin(angle) });
+      sectors.set(k, { angle: at + span / 2, from: at, to: at + span });
       place(k, at, at + span);
       at += span;
     }
   };
   // Start at the top and go clockwise.
   place(YOU, -Math.PI / 2, (3 * Math.PI) / 2);
+  return sectors;
+}
+
+/** The radial tree: each person in the middle of their sector, on their depth's ring. */
+export function radialStart(graph: MapGraph): Map<string, Point> {
+  const start = new Map<string, Point>([[YOU, { x: 0, y: 0 }]]);
+  const radii = ringRadii(graph);
+  const sectors = sectorAngles(graph);
+  for (const n of graph.nodes) {
+    const { angle } = sectors.get(n.id)!;
+    const r = radii.get(n.depth) ?? RING;
+    start.set(n.id, { x: r * Math.cos(angle), y: r * Math.sin(angle) });
+  }
   return start;
 }
 

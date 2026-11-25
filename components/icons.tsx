@@ -180,3 +180,14 @@ export function FitIcon(props: IconProps) {
     </Icon>
   );
 }
+
+/** A ring with a dot in the middle and four ticks: back to the starting view. */
+export function RecentreIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
+    </Icon>
+  );
+}

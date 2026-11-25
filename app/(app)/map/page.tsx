@@ -34,7 +34,7 @@ function MapSkeleton() {
     <div aria-hidden="true">
       <div className="h-9 w-52 rounded bg-surface-sunk" />
       <div className="mt-3 h-5 w-64 rounded bg-surface-sunk" />
-      <div className="mt-5 h-[min(60dvh,520px)] rounded-(--radius-card) bg-surface-sunk" />
+      <div className="mt-5 aspect-square max-h-[min(60dvh,520px)] w-full rounded-(--radius-card) bg-surface-sunk" />
     </div>
   );
 }

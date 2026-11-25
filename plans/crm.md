@@ -71,6 +71,9 @@ neutral login email, same shared demo account (demo markers `crm_*`).
    same network as a list grouped by who introduced who.
 6. **Install + polish:** PWA, icons, every state (empty, loading, error,
    first use), motion pass, accessibility pass.
+7. **The map in 3D:** a little solar system: you the planet, rings by
+   introduction depth, three.js on the map route only, the 2D map as
+   the fallback.
 
 Later: an MCP server so Claude can answer "who haven't I followed up with
 in 2 weeks?" and draft messages (read-only first).
@@ -1187,6 +1190,227 @@ the Map tab stays "Map".
   and an icon sheet (home screen, launcher masks, tab sizes) in
   `docs/screenshots/orbit/`.
 
+### Feature 7: The map in 3D (2026-11-25)
+
+**Goal:** the map becomes a little solar system, true to the name: you
+are the planet at the centre, the people you met yourself orbit on the
+inner ring, the people they introduced on the next ring out, and so on
+(introduction depth = ring). Everything the 2D map does stays; the 2D map
+itself stays as the fallback.
+
+**What you see** (`/map`, the same page, header, slider and list):
+- **You**: a cobalt planet at the centre, lit from one side. Not
+  tappable (as today).
+- **Rings**: one faint orbit line per depth, radius from the existing
+  `ringRadii` (so a crowded ring grows, as in 2D), each **tilted
+  differently** (a small tilt about the side-to-side axis, alternating
+  sign and growing a little with depth, capped at 20 degrees, and each
+  ring turned round the vertical by its own fixed angle), so it reads as
+  an orbit system, not a flat target.
+- **People**: small glowing spheres on their ring, sized by interactions
+  (the same square-root rule as `dotRadius`, scaled to world units), in
+  their **stage colour**: the app's three stage tones (muted for new,
+  reached out, parked; ink for talking; cobalt for interviewing, offer),
+  as map-only tokens tuned to glow on the map's background. **Not colour
+  alone**: each sphere carries its stage glyph (the same shapes as the
+  lists), drawn on top in the background colour, while it's big enough on
+  screen to read (projected radius at least 7 px).
+- **Angles**: each person's angle round their ring is the 2D radial
+  tree's sector angle (sectors by how many hang below them, children by
+  the day met, then name), so a chain stays together and lines are short.
+  Pure and deterministic, no force run (the force run is a 2D fix for
+  overlaps; rings in 3D are already apart, and people on one ring are
+  kept apart by the ring radius rule).
+- **Introduction lines**: straight 3D segments from introducer to
+  introduced (and from You to the people you met yourself), 3:1 against
+  the background.
+- **Background**: tokens only. Dark: deep space (a near-black blue) with
+  a sparse, fixed, decorative star field. Light: a pale sky (a cool
+  off-white blue), no stars.
+- **Labels**: HTML in the app font, Instrument Sans (the brief said
+  "Manrope/the app font"; the app's one font is Instrument Sans, so that
+  wins), always facing you, 12 px semibold, ink on a surface pill with a
+  line-strong edge (pairs already tested at 4.5:1). The pill shows the
+  glyph and the first name (`labelFor`). Shown only **near the camera**
+  (closer than the centre of the system) **or in focus** (the tapped
+  person), at most 8 at once, nearest first, placed with the existing
+  `placeLabels` so none overlap and none hang off the frame or sit under
+  the buttons.
+
+**Moving it:**
+- **Drag** (one finger or the primary mouse button) turns the system
+  (yaw round the vertical; pitch clamped between nearly edge-on and
+  nearly straight down, never upside down). **Pinch** and the **wheel**
+  zoom (camera distance, clamped). The same `Gestures` class decides tap
+  vs drag vs pinch: no tap after a pinch, primary button only, 8 px slop.
+- **Tap a person** opens their sheet (the same `PersonSheet`): the
+  nearest visible person within 22 px of their projected sphere's edge,
+  like 2D. People hidden behind the planet can't be tapped.
+- **Idle drift**: the camera turns slowly round the system (one turn in
+  about 3 minutes); it stops while you touch the map and for 4 s after,
+  while a sheet is open, while the page is hidden, and while the map is
+  scrolled out of view (nothing renders then).
+- **Buttons** (44 px, the existing map buttons; under the frame, see
+  the design review changes below): Zoom in, Zoom out, **Recentre** (back to the starting view: the default angle and the
+  distance that fits everyone). They ease over 600 ms with motion
+  allowed, and jump with Reduce Motion.
+- **Reduce Motion**: no drift, no eased camera moves, people appear and
+  disappear at once on the slider (with motion: a 200 ms scale-in). Read
+  after hydration, live (a change mid-visit applies).
+- The hint under the map: "Drag to turn · pinch to zoom · tap a person".
+
+**Kept from 2D:** the growth slider and Watch it grow (people appear on
+their day; a line appears once both ends are there), the summary
+sentence and the map's accessible name ("Network map. … The same network
+is listed below the map."), the list under the map (unchanged: the
+accessible version and the keyboard way in), focus back to the heading
+when a sheet opened from the map closes, the empty state, the skeleton
+and "Laying out…".
+
+**No WebGL → the 2D map, automatically**: after hydration the page tries
+a WebGL context; if there's none (or creating the renderer throws, or the
+context is lost and not restored within 2 s), it shows today's 2D map
+(`MapFrame`, unchanged). No toggle (none was asked for).
+
+**Performance:**
+- **three.js, plain** (no react-three-fiber: one imperative scene in an
+  effect, no React work per frame, a smaller bundle), loaded with a
+  dynamic `import()` from the 3D frame only, so it's a separate chunk
+  that only `/map` downloads; checked after the build (no other route's
+  scripts contain it).
+- Pixel ratio capped at 2; one shared low-poly sphere geometry, one
+  material per stage tone; all lines in one `LineSegments`; the star
+  field one `Points`. Renders only while something moves (drift, a
+  gesture, an ease, a scale-in); otherwise idle. Labels and glyphs are
+  DOM elements moved with `transform` each rendered frame (20 people: 20
+  glyphs, at most 8 labels).
+- Must stay smooth on an iPhone with the demo's 20 people; the 1,000
+  person limit must still work (no glyphs for spheres under 7 px).
+
+**Pure modules (tested), `lib/map-3d.ts`:**
+- `ringTilt(depth)`, `ringRadius3d` (from `ringRadii`), `onRing(radius,
+  angle, tilt)` → a 3D point, `orbitLayout(graph)` → every person's
+  position and ring (angles from `sectorAngles`, pulled out of
+  `radialStart` in `lib/map-layout.ts` without changing the 2D layout).
+- The camera: `type Orbit = { yaw, pitch, distance }`, `cameraPosition`,
+  `turnBy(orbit, dx, dy)` (px to radians, pitch clamped), `zoomBy`
+  (clamped to 0.35× to 1.6× of the fitting distance: further out only
+  shrinks it), `fitDistance(radius,
+  fov, aspect)` (everyone in view, the buttons' column kept clear),
+  `driftBy(orbit, ms)`, `easeOrbit(from, to, t)` (the short way round for
+  yaw).
+- `project(point, orbit, fov, width, height)` → screen x, y, depth and px
+  per world unit (the same perspective maths as three's camera; an e2e
+  tap on a projected point proves they agree); `behindPlanet`.
+- `pickPerson(projected, tap, reach)`, `labelCandidates(projected,
+  selected, near)`.
+
+**Tokens** (`lib/palette.ts` + `globals.css`, light and dark): `space`
+(the map's background), `orbit-line` (the rings: decorative, no contrast
+rule, like `line`), `map-edge` (introduction lines, 3:1 on space),
+`star-muted`, `star-ink`, `star-accent` (the three stage tones as
+spheres, each 3:1 on space; the glyph, drawn in `space`, 3:1 on each),
+`planet` (You, 3:1 on space). The scene reads them from the CSS
+variables, and again when the colour scheme changes.
+
+**Tests:** unit for all of `lib/map-3d.ts` (tilts differ per ring and
+stay within 20 degrees; everyone exactly once, on their depth's ring, at
+the 2D sector angle; deterministic; lines from parent to child; pitch and
+zoom clamps; fit keeps the outer ring in view; project agrees with a
+known camera; points behind the camera are null; the planet hides what's
+behind it; pick takes the nearest within reach, never beyond, never a
+hidden one; labels: the selected one first, at most 8, only near ones),
+the 2D layout unchanged (the `radialStart` tests still pass), palette
+contrast. Playwright: the 3D map loads (a canvas, the accessible name,
+20 people placed); tapping a person opens the right sheet, a drag or a
+right-click doesn't; Recentre puts the view back; with Reduce Motion
+nothing drifts, with motion it does; the slider at its first day shows
+one person; no WebGL → the 2D map, and the existing 2D tests run on it;
+axe in light and dark; three.js isn't in other routes' scripts.
+Screenshots at 390×844 @3x, light and dark, in
+`docs/screenshots/feature-7/`, and of the live site after deploy.
+
+**Decided after the logic check** (these replace the bullets above where
+they disagree; the simpler approach, the same maths drawn in the 2D SVG,
+was declined: the brief names three.js and real depth):
+- **People on one ring never bunch up** _(logic-checker #1)_: after the
+  sector angles, each ring's angles are spread (order kept, each moved as
+  little as it can) to at least 0.9 world units apart (0.5 left two of
+  the demo's ring-1 people overlapping on screen), or an even share of
+  the ring when it's crowded (`spreadAngles`, tested).
+- **Spheres are sized in screen px, not world units** _(#2)_: like the 2D
+  dots, `0.55 × dotRadius + 4` px (8.4 to 16.1 px radius), times a gentle
+  perspective (0.85× to 1.2×, nearer is bigger), so even the smallest sphere
+  is about 7 px and always carries its glyph. Ring radii are the 2D
+  ones, pulled in towards You and growing more slowly further out
+  (`0.55 + 0.85 × (ringRadii / RING)^0.75` world units), so ring 1 has
+  room at the fitted view and one long chain (the stress seed's is ten
+  deep) doesn't shrink everyone else to fit.
+- **One drawing that knows what's in front** _(#3, #10)_: every person
+  is one instance of a camera-facing disc (an "impostor": one instanced
+  draw call for everyone) whose shader draws the sphere in its token
+  colour with a small highlight, and the stage glyph from a six-glyph
+  atlas in the `space` colour, writing depth: a sphere in front covers
+  the one behind it, glyph included, and the planet covers whoever is
+  behind it. The glow is a second instanced pass, drawn after, without
+  depth writes. A tap takes the frontmost sphere it lands inside, else
+  the nearest edge within 22 px; a person whose centre is covered by the
+  planet or a nearer sphere can't be tapped or labelled (`onScreen`
+  marks them, tested).
+- **Survives coming back** _(#4)_: the view (yaw, pitch, distance) is
+  kept in the module, so leaving the tab and coming back keeps it; the
+  renderer is disposed with its context released (`forceContextLoss`)
+  when the page hides, and the probe's context is released at once; an
+  e2e switches tabs repeatedly.
+- **Tilts are slight and lean the same way** _(#5)_: 4 degrees for ring
+  1, 2 more for each ring out, at most 12; each ring's tilt axis is turned
+  40 degrees from the one inside it (the ring itself isn't spun, so a
+  person stays within a few degrees of their sector angle, seen from
+  above, and chains don't twist; tested). Pitch is kept between 20 and 75
+  degrees (above the steepest ring plus a margin, so no ring is ever seen
+  edge-on); it starts at 42 (fills more of the tall phone frame than 32).
+- **Drawn as the tokens say** _(#6)_: unlit materials, no tone mapping;
+  introduction lines as screen-space lines 1.5 px wide (three's
+  `LineSegments2`); rings 1 px. The glow: a soft halo in the sphere's own
+  colour, stronger in dark mode (it can only lighten the space round
+  it) and faint in light. Tokens renamed `sphere-muted`, `sphere-ink`,
+  `sphere-accent`; the stars get their own decorative token, `map-star`.
+- **Labels don't flicker** _(#7)_: recomputed four times a second, not
+  every frame (their positions follow every frame); a label appears when
+  its person is clearly nearer than the centre (0.3 units in front) and
+  goes only when clearly behind (0.3 units back); each keeps its last spot
+  while that spot is still clear (`placeLabels` takes the previous
+  spots). At most 8, as the brief asks for an uncluttered view; the list
+  and the tapped person's label carry the rest.
+- **Testable without test hooks** _(#8)_: an invisible, `aria-hidden`
+  marker per visible person (`data-node`, `data-label`, at their
+  projected sphere; `data-covered` when covered), updated four times a
+  second, so Playwright can find people and tap them. Headless Chromium
+  has WebGL (SwiftShader, checked: no flag needed); the 3D tests also
+  check a canvas is there. The no-WebGL tests stub `getContext` to return
+  nothing; the existing 2D tests run that way.
+- **Fallback gaps** _(#9)_: a three.js chunk that fails to load counts
+  as no WebGL; a lost context is `preventDefault`ed and waited for, and
+  only when it's lost while the page is visible and not back within 3 s
+  does the map switch to 2D for the rest of the visit; while probing, the
+  frame shows "Laying out…".
+- **Design review changes** (see Reviews): the start pitch is 50
+  degrees; the fit is the projected outline of the system, using the
+  whole frame, as the three buttons (Zoom in, Zoom out, Recentre) sit in a
+  row under it beside the hint (over it, a tilted system seen from above
+  runs beneath them, and keeping their corner clear shrank everything);
+  the starting view turns the deepest chain side-on; a ring with one
+  or two people steps out only 0.45 units; interviewing and offer people
+  are labelled first, and a label must sit by its own sphere.
+- **Zoom stays outside the system** _(#11)_: the closest the camera
+  gets is the larger of 0.35× the fitting distance and 1.15× the
+  system's reach.
+- Taps are picked with the view that was drawn last _(#12)_.
+- Open questions answered: the 3D/2D choice isn't remembered (it's
+  re-probed each visit); 8 labels at most (the brief's "only near the
+  camera or on focus"); pitch 42 degrees; light mode glows faintly.
+
+
 ## Reviews
 
 _One entry per feature. Every agent finding is logged with its severity
@@ -1647,3 +1871,61 @@ demo, every tab and the map, a log saved and undone).
 
 Unreviewed (carried): a real 1x desktop tab, a real Android launcher's
 crop, iOS dark and tinted home-screen icons.
+
+### Feature 7: The map in 3D (2026-11-25)
+
+#### logic-checker (plan review)
+Verdict: **Ready after fixes**. The simpler approach (the same maths drawn in the 2D SVG) was declined: the brief names three.js and real depth.
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | High | "Kept apart by the ring radius rule" was false: sectors are sized by weight, so the demo's five leaves sat 18 degrees apart and overlapped. | Fixed | `spreadAngles` per ring (order kept, gap 0.9 world units or an even share; even spacing computed directly when the ring is full); tested on the demo, a 40-person ring and 150 clustered angles. |
+| 2 | High | Spheres in world units came out 3 to 8 px at the fitted view, so glyphs never showed and stage was colour alone. | Fixed | Spheres sized in screen px like the 2D dots (`spherePx`: 8.4 to 16.1 px, gentle perspective), ring radii pulled in towards You, so every sphere carries its glyph. |
+| 3 | High | Tap picking ignored depth; DOM glyphs and labels would show through spheres in front. | Fixed | One instanced impostor disc per person, glyph drawn in the shader, writing depth; a tap takes the frontmost sphere it's inside; a person covered by the planet or a nearer sphere can't be tapped or labelled (`onScreen`, tested). |
+| 4 | High | `<Activity>` would rebuild the renderer every tab switch and leak contexts; the view would be lost. | Fixed | The view kept in the module; a fresh canvas per scene, disposed with `forceContextLoss`; the probe's context released; e2e switches tabs 20 times and checks the old context is gone. |
+| 5 | Medium | Alternating tilts and a low pitch make rings edge-on and ambiguous; turning a ring's angle origin would twist chains. | Fixed | Tilts 4 to 12 degrees, all leaning one way; only the tilt axis turns (a person stays within a degree of their angle, tested); pitch 20 to 75 degrees. |
+| 6 | Medium | Contrast tested tokens, not pixels: 1 device px lines, shading and tone mapping. | Fixed | Unlit, no tone mapping; `LineSegments2` lines 1.5 px; shading only ever away from the background; rim darkening and depth fade checked to keep 3:1 (palette test); star token added, sphere tokens renamed. |
+| 7 | Medium | Labels would flicker and hop during drift. | Fixed | Recomputed at 4 Hz with a 0.3 unit band; each keeps its last spot while clear (`placeLabels` takes previous spots, tested). |
+| 8 | Medium | Playwright can't see people in a canvas; headless WebGL might be missing. | Fixed | Invisible aria-hidden markers per person; headless Chromium has WebGL (SwiftShader, checked); the no-WebGL path is tested with a stubbed `getContext`. |
+| 9 | Medium | Fallback gaps: a failed chunk, iOS context loss in the background, a probe flash. | Fixed | A failed import gives 2D; a loss waits 3 s while visible (not while hidden); "Laying out…" while probing; e2e for loss for good, loss and restore, and the chunk failing. |
+| 10 | Medium | One mesh per person at 1,000 people. | Fixed | One instanced draw call (plus one for the glow); markers memoised. |
+| 11 | Low | Zoom-in could put the camera inside the system. | Fixed | The nearest is 1.15 × the system's reach (tested). |
+| 12 | Low | Drift vs tap. | Fine | Taps use the view that was drawn last. |
+
+#### code-reviewer
+Verdict: **Ship after fixes**.
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | Medium | `fitDistance` ignored the buttons' column: outer-ring people passed under the buttons. | Fixed | The buttons moved under the frame (see design-critic B), so the system uses the whole frame and nothing sits under a control. |
+| 2 | Low | The depth offset moved discs along the view axis, a few px off their markers and labels at the edges. | Fixed | The disc moves along its own ray to the eye; e2e pixel checks at the leftmost and rightmost people. |
+| 3 | Low | Every new `graph` (a sheet saving) tore down the WebGL context. | Fixed | The scene is rebuilt only when the network's shape changes; new stages or counts update it in place (`setPeople`). |
+| 4 | Low | The page jumped when the 2D fallback replaced the square probe frame. | Fixed | The 2D frame is square too (screenshot `map-2d-fallback`). |
+| 5 | Low | `ALONG_3D` and `MAX_ZOOM` differed from the plan. | Fixed | The plan now says 0.9 and 1.6, with why. |
+| 6 | Low | Each slider step allocates new line buffers. | Accepted | At most 40 per Watch it grow; commented. |
+| 7 | Low | Over 300 people, markers freeze while drifting and are re-diffed. | Fixed | The marker layer is memoised; markers only matter to tests. |
+| 8 | Low | Some e2e tests proved less than their names. | Fixed | 20 tab switches plus an `isContextLost` check; the bundle test awaits every response and was run against `next start` too; edge pixel checks. |
+| — | Tests | Restore within 3 s, a failed chunk, a crowded ring, three's real camera. | Fixed | All added; `project()` matches three's `PerspectiveCamera` to 0.01 px. A 1,000-person e2e is not added (unit-tested layout and on-screen maths at 1,000). |
+
+Also found while testing: a tapped person's label could find no clear spot after a drag and vanish (the full run failed on it); the person in focus is now always labelled. The frame measured 0 × 0 while hidden and squeezed the saved view; hidden sizes are ignored.
+
+#### design-critic (map, turned, zoomed, growing, sheet, drifting, playing, stress; light and dark; two passes)
+Verdict: **Ship after fixes**, then a re-check.
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | High | Stress: the ten-deep chain piled up away from the camera; a cobalt person was covered. | Fixed, partly | The starting view turns the deepest chain side-on; a ring of one or two people steps out only 0.45 units. The stress map is still dense round ring 1 (28 people, most met directly). |
+| 2 | Medium | 4 of 20 named; the cobalt people never. | Fixed | Interviewing and offer people are labelled right after the person in focus; side spots first. 6 of 20 at the start, every cobalt one among them. |
+| 3 | Medium | A label could sit nearer a neighbour's sphere than its own. | Fixed | A label must touch its own sphere and be nearer to it than any other (`labelBelongs`); the focused and important ones need only touch (re-check A). |
+| 4 | Medium | The fit wasted a third of the frame and put people under the buttons. | Fixed | The projected outline is fitted, not a ball; pitch 50 degrees; buttons under the frame (re-check B). |
+| 5 | Medium | Dark: talking outshone the cobalt people; glows bloomed. | Fixed | Dark `sphere-ink` #C9D0DB; glow by tone (cobalt most). |
+| 6 | Medium | Spheres read as washers; talking and new hard to tell apart. | Fixed | Smaller talking dot, heavier new ring, rim darkening. |
+| 7 | Medium | Few depth cues. | Fixed, partly | Spheres behind the centre fade up to 12% (still 3:1, tested); rings aren't faded. |
+| 8 | Low | The planet's ring read as an empty ring 0. | Fixed | 1.4 × its radius, 1 px, 50% opacity. |
+| 9 | Low | Label glyphs lost the stage colour. | Fixed | The list's tone colours. |
+| 10 | Low | Dark rings nearly invisible; the light planet flat. | Fixed | Dark `orbit-line` #2A3756; a lit side by day. |
+| A | Medium | (Re-check) the new label rule dropped the cobalt people where it's busy. | Fixed | Not strict for the focused and important. |
+| B | Medium | (Re-check) keeping the button column clear shrank the system. | Fixed | Fitting round the buttons' box shrank it more (a tilted system's corner runs under them), so the buttons moved into a row under the frame beside the hint. |
+| C | Low | (Re-check) sparse outer rings push the edge out. | Fixed | The 0.45 unit step for rings of one or two. |
+
+Unreviewed (carried): live drift and label changes during it, the eases and scale-ins, the focused label after the sheet closes, a real iPhone's frame rate, more than 28 people in 3D.

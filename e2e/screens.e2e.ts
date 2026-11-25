@@ -6,7 +6,7 @@
 // (or plain `npm run screens` against the dev server).
 
 import { expect, test, type Page } from "@playwright/test";
-import { freshDemo } from "./helpers/app";
+import { freshDemo, withoutWebGL } from "./helpers/app";
 import { localToday, reseedDemo } from "./helpers/seed";
 import { stressSeedPayload } from "./helpers/stress-seed";
 import { iconByFile, iconUrl } from "../lib/app-identity";
@@ -244,6 +244,8 @@ test("applications screens", async ({ page }) => {
 
 test("map screens", async ({ page }) => {
   const folder = "feature-5";
+  // The 2D map (since Feature 7, what a browser without WebGL gets).
+  await withoutWebGL(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await freshDemo(page, "/map");
   await expect(page.locator("svg [data-node]")).toHaveCount(20);
@@ -295,9 +297,82 @@ test("map screens", async ({ page }) => {
   await shoot(page, folder, "map-playing", { motion: true });
 });
 
+test("3D map screens", async ({ page }) => {
+  test.setTimeout(180_000);
+  const folder = "feature-7";
+  const markers = page.locator("span[data-node]");
+  const sphere = async (name: string) => {
+    const box = (await page.locator(`span[data-node][data-label="${name}"]`).boundingBox())!;
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  };
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await freshDemo(page, "/map");
+  await expect(page.locator("[data-map-3d] canvas")).toHaveCount(1);
+  await expect(markers).toHaveCount(20);
+  await shoot(page, folder, "map");
+
+  // Turned and looked at from higher up.
+  const frame = (await page.getByRole("img", { name: /^Network map/ }).boundingBox())!;
+  await page.mouse.move(frame.x + 30, frame.y + frame.height - 20);
+  await page.mouse.down();
+  await page.mouse.move(frame.x + 150, frame.y + frame.height + 40, { steps: 8 });
+  await page.mouse.up();
+  await shoot(page, folder, "map-turned");
+  await page.getByRole("button", { name: "Recentre" }).click();
+
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await shoot(page, folder, "map-zoomed");
+  await page.getByRole("button", { name: "Recentre" }).click();
+
+  const slider = page.getByRole("slider", { name: /Your network on/ });
+  await slider.focus();
+  await page.keyboard.press("Home");
+  for (let i = 0; i < 25; i++) await page.keyboard.press("ArrowRight");
+  await shoot(page, folder, "map-growing");
+  await page.keyboard.press("End");
+  await expect(markers).toHaveCount(20);
+
+  const riya = await sphere("Riya");
+  await page.mouse.click(riya.x, riya.y);
+  await expect(page.getByRole("dialog", { name: "Riya Patel" })).toBeVisible();
+  await shoot(page, folder, "map-sheet");
+  await page.getByRole("dialog", { name: "Riya Patel" }).getByRole("button", { name: "Close" }).click();
+
+  // With motion allowed: drifting, and Watch it grow mid-sweep.
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/map");
+  await expect(markers).toHaveCount(20);
+  await page.waitForTimeout(2500);
+  await shoot(page, folder, "map-drifting", { motion: true });
+  await page.getByRole("button", { name: "Watch it grow" }).click();
+  await page.waitForTimeout(1500);
+  await page.getByRole("button", { name: "Stop" }).click();
+  await shoot(page, folder, "map-playing", { motion: true });
+
+  // Stress: 28 people, names at the limits.
+  const { timeZone, today } = localToday();
+  try {
+    await reseedDemo(stressSeedPayload(today, timeZone));
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/map");
+    await expect(markers).toHaveCount(28);
+    await shoot(page, folder, "stress-map");
+  } finally {
+    await reseedDemo();
+  }
+
+  // No WebGL: the 2D map, in the same square frame (last: it stays off for this page).
+  await withoutWebGL(page);
+  await page.goto("/map");
+  await expect(page.locator("svg [data-node]")).toHaveCount(20);
+  await shoot(page, folder, "map-2d-fallback");
+});
+
 test("polish screens: first use, stress, skip link", async ({ page }) => {
   test.setTimeout(240_000);
   const folder = "feature-6";
+  await withoutWebGL(page); // the record of the 2D map as it was
   await page.emulateMedia({ reducedMotion: "reduce" });
   await freshDemo(page, "/");
   const { timeZone, today } = localToday();

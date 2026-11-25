@@ -25,6 +25,14 @@
   --accent-tint: #E4EBFC;
   --danger: #B3261E;
   --danger-fill: #B3261E;
+  --space: #EEF2F8;
+  --orbit-line: #C8D1DF;
+  --map-edge: #7A8394;
+  --map-star: #FFFFFF;
+  --sphere-muted: #6B7480;
+  --sphere-ink: #2A3039;
+  --sphere-accent: #1D4ED8;
+  --planet: #1E40AF;
 }
 
 /* dark */
@@ -46,6 +54,14 @@
     --accent-tint: #1D2846;
     --danger: #FF8C82;
     --danger-fill: #C2372D;
+    --space: #070B16;
+    --orbit-line: #2A3756;
+    --map-edge: #5F6B80;
+    --map-star: #B8C2D6;
+    --sphere-muted: #8E98A8;
+    --sphere-ink: #C9D0DB;
+    --sphere-accent: #8AA8FF;
+    --planet: #3D63E0;
   }
 }
 
@@ -69,6 +85,7 @@
   --color-danger: var(--danger);
   --color-danger-fill: var(--danger-fill);
   --color-scrim: var(--scrim);
+  --color-space: var(--space);
 
   --font-sans: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
 

@@ -24,7 +24,15 @@ export type ColorRole =
   | "on-accent"
   | "accent-tint"
   | "danger"
-  | "danger-fill";
+  | "danger-fill"
+  | "space"
+  | "orbit-line"
+  | "map-edge"
+  | "map-star"
+  | "sphere-muted"
+  | "sphere-ink"
+  | "sphere-accent"
+  | "planet";
 
 export type Mode = "light" | "dark";
 
@@ -45,6 +53,15 @@ export const PALETTE: Record<Mode, Record<ColorRole, string>> = {
     "accent-tint": "#E4EBFC", // selected filters, the current tab
     danger: "#B3261E",
     "danger-fill": "#B3261E", // a Delete button's fill, with white text
+    // The 3D map (plans/crm.md, Feature 7): a pale sky.
+    space: "#EEF2F8", // the map's background
+    "orbit-line": "#C8D1DF", // the rings (decorative, like line)
+    "map-edge": "#7A8394", // introduction lines: 3:1 on space
+    "map-star": "#FFFFFF", // stars (dark mode only; decorative)
+    "sphere-muted": "#6B7480", // new, reached out, parked
+    "sphere-ink": "#2A3039", // talking
+    "sphere-accent": "#1D4ED8", // interviewing, offer
+    planet: "#1E40AF", // You
   },
   dark: {
     background: "#131518", // graphite, never pure black
@@ -62,6 +79,15 @@ export const PALETTE: Record<Mode, Record<ColorRole, string>> = {
     "accent-tint": "#1D2846",
     danger: "#FF8C82",
     "danger-fill": "#C2372D", // deeper than the text red: a salmon block glares
+    // The 3D map: deep space.
+    space: "#070B16",
+    "orbit-line": "#2A3756",
+    "map-edge": "#5F6B80",
+    "map-star": "#B8C2D6",
+    "sphere-muted": "#8E98A8",
+    "sphere-ink": "#C9D0DB", // below ink: it mustn't outshine the cobalt people
+    "sphere-accent": "#8AA8FF",
+    planet: "#3D63E0",
   },
 };
 
@@ -87,6 +113,8 @@ export const TEXT_PAIRS: readonly [text: ColorRole, on: ColorRole][] = [
   ["danger", "background"],
   ["danger", "surface"],
   ["on-accent", "danger-fill"], // the Delete button: white on red
+  ["ink-muted", "space"], // "Laying out…" in the 3D map's frame
+  ["ink", "space"],
 ];
 
 /** Icons, borders and focus rings, and what they sit on. Each must be 3:1. */
@@ -101,6 +129,16 @@ export const NON_TEXT_PAIRS: readonly [mark: ColorRole, on: ColorRole][] = [
   ["danger", "surface"], // edge of a text box with an error
   ["danger", "background"], // its focus ring
   ["danger-fill", "surface"], // a Delete button's shape in a card or sheet
+  // The 3D map: what's drawn on its background, and each stage glyph (drawn in space) on its sphere.
+  ["map-edge", "space"],
+  ["sphere-muted", "space"],
+  ["sphere-ink", "space"],
+  ["sphere-accent", "space"],
+  ["space", "sphere-muted"],
+  ["space", "sphere-ink"],
+  ["space", "sphere-accent"],
+  ["planet", "space"],
+  ["edge", "space"], // the map buttons' edge on the map
 ];
 
 /** WCAG relative luminance of "#RRGGBB". */

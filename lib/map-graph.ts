@@ -171,16 +171,24 @@ export function labelSpots(x: number, y: number, r: number, width: number, heigh
  * of the labels already placed (LABEL_PAD apart) and of everyone else's
  * dot (`dots`, each with the id of the person it belongs to; DOT_PAD
  * apart); a label with no clear spot is left out. Boxes are in screen px.
+ * For the 3D map: a label that had a spot before (`previous`) tries it
+ * first, so moving labels don't hop between spots; `order` changes the
+ * order spots are tried in; `allowed` can rule a spot out.
  */
 export function placeLabels(
   labels: readonly { id: string; spots: Record<LabelSpot, Box> }[],
   dots: readonly LabelBox[] = [],
+  previous: ReadonlyMap<string, LabelSpot> = new Map(),
+  options: { order?: readonly LabelSpot[]; allowed?: (id: string, box: Box) => boolean } = {},
 ): Map<string, LabelSpot> {
   const kept: Box[] = [];
   const placed = new Map<string, LabelSpot>();
+  const order = options.order ?? LABEL_SPOTS;
   for (const label of labels) {
-    for (const spot of LABEL_SPOTS) {
+    const before = previous.get(label.id);
+    for (const spot of before ? [before, ...order.filter((s) => s !== before)] : order) {
       const box = label.spots[spot];
+      if (options.allowed && !options.allowed(label.id, box)) continue;
       const clash = kept.some((k) => overlaps(box, k, LABEL_PAD)) || dots.some((d) => d.id !== label.id && overlaps(box, d, DOT_PAD));
       if (!clash) {
         kept.push(box);

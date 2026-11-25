@@ -7,7 +7,7 @@ every application, with a map of your network at the centre.
 **Live:** [orbit-dk.vercel.app](https://orbit-dk.vercel.app) · Tap **Try the demo** on the
 login screen to look around a sample network, no email needed.
 
-![The network map: you in the middle, the people you met around you](docs/screenshots/feature-5/map-light.png)
+![The network map in 3D: you the planet at the centre, the people you met on tilted rings around you](docs/screenshots/feature-7/map-light.png)
 
 What's in it:
 
@@ -18,13 +18,17 @@ What's in it:
   timeline. Logging an interaction takes two taps and offers a follow-up.
 - **Applications**: every internship application with its status, a quick
   status change, and an import that reads rows pasted from a spreadsheet.
-- **Map**: you in the middle, everyone around you, lines for who
-  introduced whom; pinch, pan, tap a person, and watch it grow over time.
-  The same network is listed under it.
+- **Map**: a little solar system in 3D. You're the planet; the people you
+  met yourself orbit on the inner ring, the people they introduced on the
+  next, each ring tilted its own way, with lines for who introduced whom.
+  Drag to turn it, pinch to zoom, tap a person, and watch it grow over
+  time. Without WebGL it's a flat 2D map. The same network is listed
+  under it.
 - **Try the demo**: a shared sample account with 20 people and 15
   applications, put back fresh for each visitor.
 
-Mobile-first. Next.js 16 · React 19 · Tailwind 4 · Supabase · Vitest +
+Mobile-first. Next.js 16 · React 19 · Tailwind 4 · three.js (the map
+only) · Supabase · Vitest +
 PGlite · Playwright + axe. The plan, every decision and the review log
 are in [`plans/crm.md`](plans/crm.md).
 

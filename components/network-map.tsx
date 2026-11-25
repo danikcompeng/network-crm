@@ -1,6 +1,8 @@
 "use client";
 
-// The network map (plans/crm.md, Feature 5): You in the middle, everyone
+// The network map (plans/crm.md, Features 5 and 7). With WebGL it's the
+// 3D solar system (components/network-map-3d.tsx); without it (or if 3D
+// fails), this file's 2D map, unchanged: You in the middle, everyone
 // you met around you, lines for who introduced whom. A radial tree settled
 // by d3-force, laid out in the browser once per shape of the network.
 // Positions zoom; dots and labels keep their size on screen. One finger
@@ -12,6 +14,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { ContactDialog } from "@/components/contact-dialog";
 import { ChevronRightIcon, FitIcon, MinusIcon, PlusIcon } from "@/components/icons";
 import { LogSheet, type LogTarget } from "@/components/log-sheet";
+import { CONTROLS_HEIGHT, CONTROLS_INSET, MapButton, TAP_REACH, useHydrated, useReducedMotion } from "@/components/map-controls";
+import { MapFrame3D } from "@/components/network-map-3d";
 import { PersonSheet } from "@/components/person-sheet";
 import { StageLabel } from "@/components/stage-chip";
 import { StageShape } from "@/components/stage-mark";
@@ -43,13 +47,7 @@ const TONE_FILL = { muted: "var(--ink-muted)", ink: "var(--ink)", accent: "var(-
 /** Up to this many people, every label that fits shows; beyond it, only when zoomed in or tapped. */
 const ALL_LABELS_UP_TO = 40;
 const LABEL_ZOOM = 1.6;
-/** A tap picks the nearest dot within this many screen px of its edge. */
-const TAP_REACH = 22;
 const YOU_RADIUS = 18;
-/** Room kept on the right when fitting, for the zoom buttons. */
-const CONTROLS_INSET = 56;
-/** The zoom buttons' column: three 44 px buttons, 8 px apart, 8 px from the top, plus a margin. */
-const CONTROLS_HEIGHT = 8 + 3 * 44 + 2 * 8 + 8;
 const EASE_MS = 600;
 const LABEL_HEIGHT = 14;
 
@@ -76,28 +74,38 @@ function labelText(spot: LabelSpot, r: number): { x: number; y: number; anchor: 
   }
 }
 
-/** False in the server's HTML and until React has taken over the page; true after. */
-function useHydrated(): boolean {
+let webgl: boolean | null = null;
+
+/**
+ * Whether this browser can draw the 3D map (WebGL 2, which three.js
+ * needs): tried once per page load, and the trial context let go at once.
+ * Null on the server and while hydrating.
+ */
+function useWebGL(): boolean | null {
   return useSyncExternalStore(
     () => () => {},
-    () => true,
-    () => false,
-  );
-}
-
-function useReducedMotion(): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
-      const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-      query.addEventListener("change", onChange);
-      return () => query.removeEventListener("change", onChange);
+    () => {
+      if (webgl === null) {
+        try {
+          const gl = document.createElement("canvas").getContext("webgl2");
+          webgl = Boolean(gl);
+          gl?.getExtension("WEBGL_lose_context")?.loseContext();
+        } catch {
+          webgl = false;
+        }
+      }
+      return webgl;
     },
-    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    () => true, // the server and first paint assume no motion: nothing animates before we know
+    () => null,
   );
 }
 
 export function NetworkMap({ people, today }: { people: MapPerson[]; today: string }) {
+  const hasWebGL = useWebGL();
+  // 3D failed after all (three.js didn't load, or the context was lost for good): 2D for the rest of the visit.
+  const [failed, setFailed] = useState(false);
+  const onFail = useCallback(() => setFailed(true), []);
+  const mode = hasWebGL === null ? "probe" : hasWebGL && !failed ? "3d" : "2d";
   const graph = useMemo(() => buildGraph(people), [people]);
   const range = useMemo(() => growthRange(graph.nodes, today), [graph, today]);
   const totalDays = range ? daysBetween(range.first, range.last) : 0;
@@ -123,6 +131,10 @@ export function NetworkMap({ people, today }: { people: MapPerson[]; today: stri
   // A dot isn't focusable, so when its sheet closes focus goes to the heading.
   const heading = useRef<HTMLHeadingElement>(null);
   const fromDot = useRef(false);
+  const openFromMap = (id: string) => {
+    fromDot.current = true;
+    setSheetFor(id);
+  };
 
   const words = summaryText(summary).replace(/\.$/, "");
   const headline = day ? `On ${formatDay(day, today)}: ${words.toLowerCase()}.` : `${words}.`;
@@ -150,16 +162,18 @@ export function NetworkMap({ people, today }: { people: MapPerson[]; today: stri
         </div>
       ) : (
         <>
-          <MapFrame
-            graph={graph}
-            visible={visible}
-            selected={sheetFor}
-            onSelect={(id) => {
-              fromDot.current = true;
-              setSheetFor(id);
-            }}
-            summary={headline}
-          />
+          {mode === "2d" ? (
+            <MapFrame graph={graph} visible={visible} selected={sheetFor} onSelect={openFromMap} summary={headline} />
+          ) : mode === "3d" ? (
+            <MapFrame3D graph={graph} visible={visible} selected={sheetFor} onSelect={openFromMap} summary={headline} onFail={onFail} />
+          ) : (
+            <div className="relative mt-5">
+              <div className="flex aspect-square max-h-[min(60dvh,520px)] w-full items-center justify-center rounded-(--radius-card) border border-line-strong bg-space text-ink-muted">
+                Laying out…
+              </div>
+              <p className="mt-2 text-sm text-ink-muted">&nbsp;</p>
+            </div>
+          )}
           {range && <GrowthSlider range={range} totalDays={totalDays} step={step} onStep={setStep} today={today} everyone={graph.nodes.length} />}
           <section aria-labelledby="network-list" className="mt-8">
             <h2 id="network-list" className="text-section font-semibold tracking-tight">
@@ -410,7 +424,7 @@ function MapFrame({ graph, visible, selected, onSelect, summary }: FrameProps) {
     <div className="relative mt-5">
       <div
         ref={frame}
-        className="relative h-[min(60dvh,520px)] touch-none overflow-hidden rounded-(--radius-card) border border-line-strong bg-surface select-none"
+        className="relative aspect-square max-h-[min(60dvh,520px)] w-full touch-none overflow-hidden rounded-(--radius-card) border border-line-strong bg-surface select-none"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -511,19 +525,6 @@ function MapFrame({ graph, visible, selected, onSelect, summary }: FrameProps) {
       </div>
       <p className="mt-2 text-sm text-ink-muted">Drag to move · pinch to zoom · tap a person</p>
     </div>
-  );
-}
-
-function MapButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      className="flex size-11 items-center justify-center rounded-(--radius-field) border border-edge bg-surface text-ink transition-colors duration-(--motion-fast) active:bg-surface-press"
-    >
-      {children}
-    </button>
   );
 }
 

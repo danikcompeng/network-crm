@@ -1,7 +1,13 @@
-// The network map (plans/crm.md, Feature 5), on the real demo account.
+// The 2D network map (plans/crm.md, Feature 5), on the real demo account.
+// Since Feature 7 it's the fallback for a browser with no WebGL, so every
+// test here turns WebGL off; the 3D map's tests are in map-3d.e2e.ts.
 import { expect, test, type Page } from "@playwright/test";
-import { expectNoA11yViolations, freshDemo } from "./helpers/app";
+import { expectNoA11yViolations, freshDemo, withoutWebGL } from "./helpers/app";
 import { reseedDemo } from "./helpers/seed";
+
+test.beforeEach(async ({ page }) => {
+  await withoutWebGL(page);
+});
 
 test.afterAll(async () => {
   await reseedDemo();

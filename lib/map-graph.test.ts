@@ -137,6 +137,22 @@ describe("dots and labels", () => {
     const two = placeLabels([{ id: "a", spots: labelSpots(0, 0, 10, 40, 14) }, { id: "c", spots: labelSpots(0, 18, 0, 40, 14) }]);
     expect(two.get("c")).not.toBe("below");
   });
+
+  it("a label keeps its previous spot while it's clear, and moves on when it isn't", () => {
+    const at = (id: string, x: number, y: number) => ({ id, spots: labelSpots(x, y, 10, 40, 14) });
+    const dot = (id: string, x: number, y: number) => ({ id, x: x - 10, y: y - 10, width: 20, height: 20 });
+    expect(placeLabels([at("a", 0, 0)], [], new Map([["a", "left"]])).get("a")).toBe("left");
+    // Something moved into its old spot: back to the usual order.
+    expect(placeLabels([at("a", 0, 0)], [dot("x", -40, 0)], new Map([["a", "left"]])).get("a")).toBe("below");
+  });
+
+  it("the order of spots can change, and a spot can be ruled out", () => {
+    const at = (id: string, x: number, y: number) => ({ id, spots: labelSpots(x, y, 10, 40, 14) });
+    expect(placeLabels([at("a", 0, 0)], [], new Map(), { order: ["right", "below"] }).get("a")).toBe("right");
+    const notRight = placeLabels([at("a", 0, 0)], [], new Map(), { order: ["right", "left"], allowed: (_, box) => box.x < 0 });
+    expect(notRight.get("a")).toBe("left");
+    expect(placeLabels([at("a", 0, 0)], [], new Map(), { allowed: () => false }).has("a")).toBe(false);
+  });
   it("labels: a lone title or an empty name doesn't break", () => {
     expect(labelFor("Dr.")).toBe("Dr.");
     expect(labelFor("")).toBe("");

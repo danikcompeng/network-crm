@@ -39,3 +39,18 @@ export async function expectNoA11yViolations(page: Page) {
   const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
 }
+
+/**
+ * Makes the page's browser have no WebGL (every getContext("webgl…")
+ * answers null), so the map falls back to 2D (plans/crm.md, Feature 7).
+ * Call before the page loads.
+ */
+export async function withoutWebGL(page: Page) {
+  await page.addInitScript(() => {
+    const original = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string, ...rest: unknown[]) {
+      if (/webgl/i.test(type)) return null;
+      return (original as (this: HTMLCanvasElement, ...args: unknown[]) => unknown).call(this, type, ...rest);
+    } as typeof original;
+  });
+}
