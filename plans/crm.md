@@ -1640,9 +1640,10 @@ seen at an angle, to be clear of Ionic), gave the live address
 | 7 | Low | `PRODUCTION_URL` exported but unused. | Fixed | Removed; the address is in the comments and docs. |
 | — | Found while drawing | A mask on the rotated `<ellipse>` turns with it, cutting a V out of the ring; a half-ellipse arc between exactly opposite points is ambiguous. | Fixed | The mask sits on a group; each half is two quarter arcs. |
 
-**Production checks** against https://orbit-dk.vercel.app: the smoke test
-passed before this change was deployed; the smoke and install checks run
-again after the push deploys it.
+**Production checks** against https://orbit-dk.vercel.app, after the
+deploy of 201c840: all 11 pass (the manifest and four icons without a
+login, the orbit mark's pixels, the login link's landing address, the
+demo, every tab and the map, a log saved and undone).
 
 Unreviewed (carried): a real 1x desktop tab, a real Android launcher's
 crop, iOS dark and tinted home-screen icons.
