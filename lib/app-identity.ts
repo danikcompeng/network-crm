@@ -1,11 +1,10 @@
 // The app's name, description, icon and home-screen manifest, in one place
-// (plans/crm.md, Feature 6). "Network" is the working name (pick a real one
-// before it ships), so renaming it is a one-line change. Same approach as
-// Hold's app identity.
+// (plans/crm.md, Feature 6 and "Renamed to Orbit"). Same approach as Hold's
+// app identity.
 import type { MetadataRoute } from "next";
 import { PALETTE } from "./palette";
 
-export const APP_NAME = "Network";
+export const APP_NAME = "Orbit";
 export const APP_DESCRIPTION = "Who you met, who introduced you, and when to follow up.";
 
 /** The icon's colours: the cobalt field and the white mark on it. */
@@ -17,34 +16,19 @@ export const ICON_COLORS = {
 export type Point = readonly [x: number, y: number];
 
 /**
- * The network mark, in a 0 0 100 100 box: a solid hub (you) with spokes to
- * three ringed contacts. The old tab icon's drawing (a 64 px box, scaled
- * by 100/64), with the bottom spoke ending on its ring's stroke instead of
- * poking inside it.
+ * The orbit mark, in a 0 0 100 100 box centred on (50, 50): a solid dot
+ * (you) with one unbroken ring around it and a small dot (a person) on the
+ * ring, like a bead: wider than the ring's stroke, so it shows on both
+ * sides of it. Angles in degrees, 0 to the right, positive downwards
+ * (screen y runs down). The small dot sits low on the left, away from the
+ * upper right, and the ring isn't cut open around it: a ring cut around a
+ * dot at the upper right is the Ionic framework's logo (design-critic).
  */
-export const NETWORK_MARK = {
-  hub: { center: [50, 50], r: 11.7 },
-  rings: [
-    [21.9, 25.8],
-    [78.1, 29.7],
-    [67.2, 78.9],
-  ],
-  ringRadius: 8.2,
-  stroke: 5.5,
-  spokes: [
-    [
-      [28.8, 32.2],
-      [42.5, 44.7],
-    ],
-    [
-      [70.9, 35.6],
-      [58.1, 45.6],
-    ],
-    [
-      [61.5, 69.6],
-      [55.3, 59.4],
-    ],
-  ],
+export const ORBIT_MARK = {
+  core: 12, // the centre dot's radius
+  orbit: 28, // the ring's radius, to the middle of its stroke
+  stroke: 7,
+  moon: { angle: 150, r: 9 },
 } as const;
 
 /**
@@ -55,10 +39,11 @@ export const MASKABLE_SAFE_RADIUS = 40;
 
 /**
  * How much smaller the mark is drawn on the maskable icon, about the
- * centre (50, 50). The top-left ring reaches farthest (about 48 at full
- * size, its stroke included): 38.4 at 0.8, inside the 40 circle.
+ * centre. At full size it already fits the safe circle (37 of 40), with
+ * little room for launchers that crop further; at 0.95 it reaches 35.2
+ * and looks nearly the size it is on the other icons.
  */
-export const MASKABLE_SCALE = 0.8;
+export const MASKABLE_SCALE = 0.95;
 
 /**
  * - "rounded": a rounded square, for browser tabs and Android's "any" icon.
@@ -70,34 +55,43 @@ export const MASKABLE_SCALE = 0.8;
 export type IconShape = "rounded" | "full" | "maskable";
 
 export type MarkGeometry = {
-  hub: { center: Point; r: number };
-  rings: Point[];
-  ringRadius: number;
+  center: Point;
+  core: number;
+  orbit: number;
   stroke: number;
-  spokes: [Point, Point][];
+  moon: { center: Point; r: number };
 };
 
 /** The mark for an icon shape, in the 0 0 100 100 box. */
 export function markGeometry(shape: IconShape): MarkGeometry {
   const k = shape === "maskable" ? MASKABLE_SCALE : 1;
-  const place = ([x, y]: Point): Point => [50 + (x - 50) * k, 50 + (y - 50) * k];
+  const t = (ORBIT_MARK.moon.angle * Math.PI) / 180;
+  const orbit = ORBIT_MARK.orbit * k;
   return {
-    hub: { center: place(NETWORK_MARK.hub.center), r: NETWORK_MARK.hub.r * k },
-    rings: NETWORK_MARK.rings.map(place),
-    ringRadius: NETWORK_MARK.ringRadius * k,
-    stroke: NETWORK_MARK.stroke * k,
-    spokes: NETWORK_MARK.spokes.map(([a, b]) => [place(a), place(b)] as [Point, Point]),
+    center: [50, 50],
+    core: ORBIT_MARK.core * k,
+    orbit,
+    stroke: ORBIT_MARK.stroke * k,
+    moon: { center: [50 + orbit * Math.cos(t), 50 + orbit * Math.sin(t)], r: ORBIT_MARK.moon.r * k },
   };
 }
 
 /** How far the drawn mark reaches from the icon's centre (strokes included). */
 export function markReach(mark: MarkGeometry): number {
   const from = ([x, y]: Point) => Math.hypot(x - 50, y - 50);
-  return Math.max(
-    from(mark.hub.center) + mark.hub.r,
-    ...mark.rings.map((c) => from(c) + mark.ringRadius + mark.stroke / 2),
-    ...mark.spokes.flat().map((p) => from(p) + mark.stroke / 2),
-  );
+  return Math.max(mark.core, mark.orbit + mark.stroke / 2, from(mark.moon.center) + mark.moon.r);
+}
+
+/** The drawing's bounding box in the 0 0 100 100 box: [left, top, right, bottom]. */
+export function markBounds(mark: MarkGeometry): [number, number, number, number] {
+  const ring = mark.orbit + mark.stroke / 2;
+  const [mx, my] = mark.moon.center;
+  return [
+    Math.min(50 - ring, mx - mark.moon.r),
+    Math.min(50 - ring, my - mark.moon.r),
+    Math.max(50 + ring, mx + mark.moon.r),
+    Math.max(50 + ring, my + mark.moon.r),
+  ];
 }
 
 export type AppIconFile = {
@@ -124,7 +118,7 @@ export const APP_ICONS: readonly AppIconFile[] = [
  * lib/app-identity.test.ts pins the drawing next to this number, so a
  * changed drawing fails a test until the version is bumped with it.
  */
-export const ICON_VERSION = 1; // 1: the network mark (2026-11-25)
+export const ICON_VERSION = 2; // 1: the network mark; 2: the orbit mark (2026-11-25)
 
 export const iconUrl = (icon: AppIconFile) => `/icons/${icon.file}?v=${ICON_VERSION}`;
 

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
-  Network's design tokens (plans/crm.md, Design direction).
+  Orbit's design tokens (plans/crm.md, Design direction).
   The colours here must match lib/palette.ts: lib/palette.test.ts checks
   both, and their contrast. Use the token classes (bg-surface,
   text-ink-muted, ...), never a raw colour, in components.
@@ -50,7 +50,7 @@
 }
 
 @theme inline {
-  /* Only Network's colours exist as classes: Tailwind's default palette is
+  /* Only Orbit's colours exist as classes: Tailwind's default palette is
      switched off, so a stray bg-gray-100 can't sneak in. */
   --color-*: initial;
   --color-background: var(--background);

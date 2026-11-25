@@ -1,4 +1,4 @@
-// Network's colours, light and dark (plans/crm.md, Design direction).
+// Orbit's colours, light and dark (plans/crm.md, Design direction).
 //
 // app/globals.css holds the same values as CSS variables, which is what
 // the screens use. This file exists so the colours can be tested:

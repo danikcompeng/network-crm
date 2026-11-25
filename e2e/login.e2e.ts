@@ -5,7 +5,8 @@ import { reseedDemo } from "./helpers/seed";
 test("a signed-out visit goes to the login page", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByRole("heading", { name: "Network" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Orbit" })).toBeVisible();
+  await expect(page).toHaveTitle("Log in · Orbit");
 });
 
 test("the login page is accessible, in light and dark", async ({ page }) => {

@@ -1,4 +1,4 @@
-// Network's buttons: flat, drawn with a hairline, 12 px corners
+// Orbit's buttons: flat, drawn with a hairline, 12 px corners
 // (plans/crm.md, Design direction). Pressed, the background deepens; no
 // movement, so Reduce Motion needs no special case.
 //

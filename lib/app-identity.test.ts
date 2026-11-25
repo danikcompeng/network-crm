@@ -6,11 +6,12 @@ import {
   ICON_VERSION,
   MASKABLE_SAFE_RADIUS,
   MASKABLE_SCALE,
-  NETWORK_MARK,
+  ORBIT_MARK,
   appManifest,
   iconByFile,
   iconUrl,
   markGeometry,
+  markBounds,
   markReach,
 } from "./app-identity";
 import { PALETTE, contrast } from "./palette";
@@ -38,34 +39,22 @@ describe("app icons", () => {
   });
 
   it("pins the drawing to ICON_VERSION: change the drawing, bump the version and this test together", () => {
-    expect({ version: ICON_VERSION, NETWORK_MARK, MASKABLE_SCALE, ICON_COLORS }).toEqual({
-      version: 1,
-      NETWORK_MARK: {
-        hub: { center: [50, 50], r: 11.7 },
-        rings: [
-          [21.9, 25.8],
-          [78.1, 29.7],
-          [67.2, 78.9],
-        ],
-        ringRadius: 8.2,
-        stroke: 5.5,
-        spokes: [
-          [
-            [28.8, 32.2],
-            [42.5, 44.7],
-          ],
-          [
-            [70.9, 35.6],
-            [58.1, 45.6],
-          ],
-          [
-            [61.5, 69.6],
-            [55.3, 59.4],
-          ],
-        ],
-      },
-      MASKABLE_SCALE: 0.8,
+    const rounded = (shape: "full" | "maskable") =>
+      JSON.parse(JSON.stringify(markGeometry(shape), (_key, v) => (typeof v === "number" ? Math.round(v * 100) / 100 : v)));
+    expect({
+      version: ICON_VERSION,
+      ORBIT_MARK,
+      MASKABLE_SCALE,
+      ICON_COLORS,
+      full: rounded("full"),
+      maskable: rounded("maskable"),
+    }).toEqual({
+      version: 2,
+      ORBIT_MARK: { core: 12, orbit: 28, stroke: 7, moon: { angle: 150, r: 9 } },
+      MASKABLE_SCALE: 0.95,
       ICON_COLORS: { field: "#1D4ED8", mark: "#FFFFFF" },
+      full: { center: [50, 50], core: 12, orbit: 28, stroke: 7, moon: { center: [25.75, 64], r: 9 } },
+      maskable: { center: [50, 50], core: 11.4, orbit: 26.6, stroke: 6.65, moon: { center: [26.96, 63.3], r: 8.55 } },
     });
   });
 
@@ -75,26 +64,36 @@ describe("app icons", () => {
   });
 });
 
-describe("the network mark", () => {
-  it("is drawn as specified on the tab and iPhone icons", () => {
-    for (const shape of ["rounded", "full"] as const) {
+describe("the orbit mark", () => {
+  it("is a centre dot, one ring around it and a small dot on the ring, low on the left", () => {
+    const mark = markGeometry("full");
+    const [x, y] = mark.moon.center;
+    expect(Math.hypot(x - 50, y - 50)).toBeCloseTo(mark.orbit, 6);
+    expect(x).toBeLessThan(50);
+    expect(y).toBeGreaterThan(50);
+  });
+
+  it("the small dot shows on both sides of the ring (a bead), smaller than you, and the centre dot is clear of the ring", () => {
+    for (const shape of ["full", "maskable"] as const) {
       const mark = markGeometry(shape);
-      expect(mark.rings).toEqual(NETWORK_MARK.rings);
-      expect(mark.stroke).toBe(NETWORK_MARK.stroke);
+      // Past the ring's stroke on each side by at least a third of its own radius.
+      expect(mark.moon.r - mark.stroke / 2).toBeGreaterThan(mark.moon.r / 3);
+      expect(mark.moon.r).toBeLessThan(mark.core);
+      expect(mark.orbit - mark.stroke / 2 - mark.core).toBeGreaterThan(mark.core * 0.75);
     }
   });
 
-  it("keeps all of the maskable mark (strokes included) inside Android's safe circle", () => {
-    const reach = markReach(markGeometry("maskable"));
-    expect(reach).toBeLessThanOrEqual(MASKABLE_SAFE_RADIUS);
-    // Not shrunk more than it needs to be.
-    expect(reach).toBeGreaterThan(MASKABLE_SAFE_RADIUS * 0.9);
-    // At full size it would NOT fit, so the scaling matters.
-    expect(markReach(markGeometry("full"))).toBeGreaterThan(MASKABLE_SAFE_RADIUS);
+  it("keeps all of the maskable mark inside Android's safe circle, with room for launchers that crop further", () => {
+    expect(markReach(markGeometry("maskable"))).toBeLessThanOrEqual(MASKABLE_SAFE_RADIUS * 0.9);
+  });
+
+  it("its bounding box: the small dot on the left, the ring on the other three sides", () => {
+    expect(markBounds(markGeometry("full")).map((n) => Math.round(n * 100) / 100)).toEqual([16.75, 18.5, 81.5, 81.5]);
   });
 
   it("stays inside the icon's square, with a margin", () => {
-    expect(markReach(markGeometry("full"))).toBeLessThan(50);
+    // The small dot reaches farthest: 28 + 9.
+    expect(markReach(markGeometry("full"))).toBeCloseTo(37, 6);
   });
 });
 

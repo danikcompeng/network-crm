@@ -1,4 +1,4 @@
-# Network
+# Orbit
 
 A personal CRM for an internship search: the people you meet, who
 introduced you to whom, what you talked about, when to follow up, and

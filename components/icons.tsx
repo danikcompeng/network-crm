@@ -1,4 +1,4 @@
-// Network's icons: 1.75 px line drawings on a 24 px grid, drawn inline so
+// Orbit's icons: 1.75 px line drawings on a 24 px grid, drawn inline so
 // they take the text colour (currentColor). Decorative unless labelled.
 
 import type { SVGProps } from "react";
@@ -81,19 +81,6 @@ export function SearchIcon(props: IconProps) {
     <Icon {...props}>
       <circle cx="11" cy="11" r="6.5" />
       <path d="M16 16l4 4" />
-    </Icon>
-  );
-}
-
-/** The app's mark: you in the middle, three people around you, linked. */
-export function NetworkMark(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <circle cx="12" cy="12" r="2.75" fill="currentColor" stroke="none" />
-      <circle cx="5" cy="6" r="2" />
-      <circle cx="19" cy="7" r="2" />
-      <circle cx="16" cy="19" r="2" />
-      <path d="M6.6 7.2l3.3 3M17.3 8.1l-3.1 2.4M15.4 17.1l-2.3-3.1" />
     </Icon>
   );
 }

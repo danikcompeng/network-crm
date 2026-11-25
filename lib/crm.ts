@@ -1,4 +1,4 @@
-// The words Network is built from: people's stages, kinds of interaction,
+// The words Orbit is built from: people's stages, kinds of interaction,
 // application statuses, and how long each text can be (plans/crm.md, Data
 // model). The migration has the same lists as check constraints;
 // lib/crm.test.ts reads the SQL and fails if the two disagree.

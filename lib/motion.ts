@@ -1,4 +1,4 @@
-// Network's motion timings (plans/crm.md, Design direction). The same
+// Orbit's motion timings (plans/crm.md, Design direction). The same
 // numbers are CSS variables in app/globals.css (--motion-*), for classes
 // like duration-(--motion-fast); lib/motion.test.ts checks the two match.
 

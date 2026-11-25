@@ -2,8 +2,8 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { DemoLogin } from "@/components/demo-login";
-import { NetworkMark } from "@/components/icons";
 import { LoginForm } from "@/components/login-form";
+import { OrbitMark } from "@/components/orbit-mark";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/app-identity";
 import { demoCredentials } from "@/lib/demo";
 
@@ -15,7 +15,7 @@ export default function LoginPage() {
     // gutter (px-5); larger screens get a centred column.
     <main className="mx-auto flex w-full max-w-[28rem] flex-1 flex-col px-5 pt-[max(4rem,calc(env(safe-area-inset-top)+3rem))] pb-[max(2rem,env(safe-area-inset-bottom))]">
       <header className="mb-10">
-        <NetworkMark size={40} className="text-accent" />
+        <OrbitMark size={32} cropped className="text-accent" />
         <h1 tabIndex={-1} className="outline-none mt-5 text-display font-semibold tracking-tight text-ink">{APP_NAME}</h1>
         <p className="mt-3 text-lead text-ink-muted">{APP_DESCRIPTION}</p>
       </header>

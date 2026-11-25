@@ -1,4 +1,4 @@
-# Network (personal CRM)
+# Orbit (personal CRM)
 
 A personal CRM for my internship search and network: applications, contacts, interactions,
 follow-ups, and a map of who introduced me to who. Mobile-first,

@@ -9,6 +9,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { freshDemo } from "./helpers/app";
 import { localToday, reseedDemo } from "./helpers/seed";
 import { stressSeedPayload } from "./helpers/stress-seed";
+import { iconByFile, iconUrl } from "../lib/app-identity";
 
 const SCHEMES = ["light", "dark"] as const;
 
@@ -46,6 +47,57 @@ test.describe("signed out", () => {
     await page.getByRole("button", { name: "I already have a code" }).click();
     await expect(page.getByRole("textbox", { name: "Code from the email" })).toBeVisible();
     await shoot(page, folder, "login-code");
+  });
+
+  test("orbit screens: the login and the icon at real sizes", async ({ page }) => {
+    const folder = "orbit";
+    await page.goto("/login");
+    await expect(page.getByRole("heading", { level: 1, name: "Orbit" })).toBeVisible();
+    await shoot(page, folder, "login");
+
+    // The icon as phones and browsers show it. The blank tiles stand in for
+    // other apps on a home screen (no real apps imitated).
+    const src = (file: string) => iconUrl(iconByFile(file)!);
+    const tile = (label: string, inner: string) => `<figure><div class="slot">${inner}</div><figcaption>${label}</figcaption></figure>`;
+    const blank = (label: string) => tile(label, `<div class="blank"></div>`);
+    await page.setContent(`<!doctype html><html><head><style>
+      :root { color-scheme: light dark; font: 13px/1.3 system-ui, sans-serif; }
+      body { margin: 0; padding: 20px; background: #F3F4F6; color: #111; }
+      @media (prefers-color-scheme: dark) { body { background: #0B0F17; color: #EEE; } }
+      h2 { font-size: 13px; font-weight: 600; margin: 20px 0 10px; opacity: .7; }
+      .row { display: flex; gap: 18px; align-items: flex-end; flex-wrap: wrap; }
+      figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+      figcaption { font-size: 11px; }
+      .home { display: grid; grid-template-columns: repeat(4, 60px); justify-content: space-between; row-gap: 16px; padding: 18px 14px;
+              border-radius: 24px; background: linear-gradient(160deg, #7C9BB8, #3E5872); color: #fff; }
+      @media (prefers-color-scheme: dark) { .home { background: linear-gradient(160deg, #1F2A37, #0E141C); } }
+      .slot { width: 60px; height: 60px; }
+      .slot img, .blank { width: 60px; height: 60px; border-radius: 13.5px; display: block; }
+      .blank { background: rgba(255,255,255,.35); }
+      .circle { border-radius: 50%; } .squircle { border-radius: 30%; } .square { border-radius: 12%; }
+      .android img { width: 64px; height: 64px; display: block; }
+      .tab { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 8px; background: rgba(127,127,127,.15); }
+    </style></head><body>
+      <h2>iPhone home screen (apple-touch-icon, 60 pt)</h2>
+      <div class="home">
+        ${blank("App")}${blank("App")}${tile("Orbit", `<img src="${src("apple-touch-icon.png")}" alt="">`)}${blank("App")}
+        ${blank("App")}${blank("App")}${blank("App")}${blank("App")}
+      </div>
+      <h2>Android launchers (maskable, cut to the launcher's shape)</h2>
+      <div class="row android">
+        ${["circle", "squircle", "square"].map((c) => `<figure><img class="${c}" src="${src("icon-maskable-512.png")}" alt=""><figcaption>${c}</figcaption></figure>`).join("")}
+        <figure><img src="${src("icon-192.png")}" alt=""><figcaption>any</figcaption></figure>
+      </div>
+      <h2>Browser tab (icon-192 at 16 and 32 px)</h2>
+      <div class="row">
+        <div class="tab"><img src="${src("icon-192.png")}" width="16" height="16" alt="">Today · Orbit</div>
+        <img src="${src("icon-192.png")}" width="32" height="32" alt="">
+      </div>
+      <h2>Large (icon-512 at 160 px)</h2>
+      <img src="${src("icon-512.png")}" width="160" height="160" alt="">
+    </body></html>`);
+    await page.evaluate(() => Promise.all([...document.images].map((img) => img.decode())));
+    await shoot(page, folder, "icons");
   });
 });
 

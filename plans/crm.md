@@ -1,6 +1,6 @@
 # Personal network CRM: plan
 
-Started Nov 24, 2026. Working name: **Network** (pick a real name before it ships).
+Started Nov 24, 2026. The app is **Orbit** (renamed from the working name "Network" on Nov 25, 2026; the repo stays `network-crm`).
 
 ## Why
 
@@ -278,7 +278,7 @@ overdue, today, the next 7 days, later and none, so Today and the map
 have something true to show from the first visit. Applications are added
 to the seed in Feature 3 (the function already takes them).
 
-When to reseed: Hold's rule, with Network's own markers in the shared
+When to reseed: Hold's rule, with Orbit's own markers in the shared
 demo account's metadata (`crm_demo_seeded_at`, `crm_demo_seeded_day`):
 never seeded, seeded over an hour ago, seeded for an earlier day than
 the visitor's today, or seeded "in the future" (a hand-set clock).
@@ -361,7 +361,7 @@ button falls back to the Site URL, which is another app
 _(logic-checker #12)_. The typed code works either way.
 
 **Known limits.** Supabase writes user metadata as a whole, so a Hold and
-a Network demo seed finishing in the same instant can lose one marker
+an Orbit demo seed finishing in the same instant can lose one marker
 (the next sign-in reseeds; harmless). Removed people can't be restored
 (no undo of a delete). A demo seeded by a visitor further east is up to
 a day ahead for up to an hour: a follow-up "due today" for them shows as
@@ -1063,7 +1063,7 @@ changes, `--motion-sheet` 250 ms, `--ease-out`):
 Android, running it, the reviewers. CLAUDE.md: e2e on port 3201 and
 screenshots from a production build on 3300 (3200 is Hold's).
 
-**Name:** the working name "Network" stays until the user picks one;
+**Name:** _(superseded by "Renamed to Orbit")_ the working name "Network" stays until the user picks one;
 renaming is `APP_NAME` plus an `ICON_VERSION` bump only if the mark
 changes.
 
@@ -1096,7 +1096,7 @@ where they disagree; no migration is needed):
   are fine. The regexes are regex literals; the palette test's
   "no mixed colours" regex, which could never fail (`\b` in a template
   string), is fixed the same way.
-- **Ports stay as they are** _(#5)_: 3200 is Network's port (package.json,
+- **Ports stay as they are** _(#5)_: 3200 is Orbit's port (package.json,
   the e2e default, the login link fallback, Supabase's redirect list).
   CLAUDE.md says how to point e2e and screenshots elsewhere with
   `BASE_URL` when 3200 is taken.
@@ -1126,6 +1126,41 @@ inside the safe circle; the version pinned to the geometry), the manifest,
 and the motion rule; e2e for install (manifest and icons served without a
 login, the right link tags), the accessibility sweep, not-found and the
 in-app error boundary.
+
+### Renamed to Orbit (2026-11-25)
+
+The user named the app **Orbit**. The repo stays `network-crm`, the
+Vercel project is `orbit-crm`, and the Map tab stays "Map".
+
+- `APP_NAME = "Orbit"`: the manifest's name and short name, every page
+  title ("Today · Orbit"), the iPhone home-screen title and the login
+  heading all come from it. README, CLAUDE.md, the plan's header and the
+  three reviewer agents say Orbit; comments that named the app too.
+- **Not renamed:** the login cookie stays `network-auth` (renaming it
+  would log everyone out, and nobody sees it); the applied migration's
+  header comment (applied migrations are never edited); the map's
+  accessible name ("Network map", it's a map of your network); the
+  repo and package name. Earlier review logs keep the name they were
+  written under.
+- **The icon** didn't fit the name (a hub with spokes to three rings), so
+  it's replaced by the **orbit mark**: a solid centre dot (you), one
+  unbroken ring around it, and a small dot (a person) on the ring like a
+  bead, low on the left (150 degrees), white on the app's cobalt, no
+  letters (core 12, ring 28, stroke 7, small dot 9, in a 100 box). Not
+  cut open around the dot, and not at the upper right: that's the Ionic
+  framework's logo (design-critic). One
+  drawing (`components/orbit-mark.tsx`, geometry in `ORBIT_MARK`) is used
+  by the icon PNGs and the login screen, where it's cropped to the drawing
+  so it lines up with the text column. `ICON_VERSION` 1 → 2 so browsers
+  and Android fetch the new PNGs.
+- The maskable icon draws the mark at 0.95 (reach 35.2 of the 40 safe
+  circle; 37 of 50 on the others).
+- **Tests:** the drawing (constants and computed geometry) pinned to the
+  version; the dot on the ring and showing past it; the maskable reach;
+  pixels of the real PNGs (centre dot, unbroken ring, small dot past the
+  ring, the maskable scale); the login heading and title say Orbit. Screenshots of the login
+  and an icon sheet (home screen, launcher masks, tab sizes) in
+  `docs/screenshots/orbit/`.
 
 ## Reviews
 
@@ -1515,3 +1550,36 @@ Verdict: **Ship after fixes**.
 | 12 | Low | The maskable mark reaches 38.4 of the 40 safe radius; the full icon's mark is large. | Accepted | Inside Android's safe zone by spec (the circle mask has 10 more to the edge); the mark is the old tab icon's size. |
 
 Unreviewed (carried): the log sheet with a long name, the 120-character role row in the Applications list, levels 5–6 of a deep chain, the rendered error and not-found pages, skeletons, the sheet entrance on a real phone, the icons on a real home screen.
+
+### Renamed to Orbit (2026-11-25)
+
+No logic-checker pass: the user asked for code-reviewer and design-critic
+on the changed screens and icon.
+
+#### code-reviewer
+Verdict: **Ship**. No bug users would hit; the findings were about tests.
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | Medium | The version-pin test covered the constants, not the computed drawing (formulas, line caps). | Fixed | The test also pins `markGeometry("full")` and `("maskable")` output next to `ICON_VERSION`. |
+| 2 | Low | Two assertions couldn't fail (a path rebuilt with the code's own template; maskable/40 = full/50 by construction). | Fixed | Both gone with the cut ring; the maskable test now asks for 10% room inside the safe circle. |
+| 3 | Low | The half-gap formula only held for small gaps. | No longer applies | The ring isn't cut any more (design-critic #1). |
+| 4 | Low | `OrbitMark` wasn't hidden from screen readers by default. | Fixed | `aria-hidden` and `focusable="false"` unless a caller passes `aria-label`. |
+| 5 | Low | Pixel checks skipped icon-192 and one side of the gap. | Fixed | icon-192 is checked like the others; the gap is gone; new pixels check the ring is unbroken and the small dot shows past it. |
+| — | Note | The Feature 6 "Name:" bullet still said "Network" stays. | Fixed | Marked superseded. |
+
+#### design-critic (two passes: login and icon sheet, light and dark)
+Verdict: **Ship after fixes**, then the one open point left to the user.
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | High | A ring cut open around a small dot at the upper right, white on blue, is the Ionic framework's logo. | Fixed, partly; flagged to the user | The ring is unbroken with the small dot on it like a bead (r 9, wider than the 7 stroke), moved to the lower left (150°). The second pass still finds the overall idea close to Ionic's: a centre dot, one ring and one small dot is the brief itself, so changing that (two dots on the ring, or an elliptical orbit) is the user's call. |
+| 2 | Medium | At 16 px on a 1x screen the stroke and gap went below a pixel. | Fixed, partly | Stroke 6 → 7 (1.1 px at 16) and no gap. Accepted: no separate heavier favicon drawing; tabs at 2x and phones are fine, and a 1x desktop tab shows a ring with a bump. |
+| 3 | Medium | The login mark was about 25 px and sat about 7 px inside the text column. | Fixed | Cropped to the drawing's exact bounds (`markBounds`) at 32 px tall: flush with the 20 px column, the heading's cap height. |
+| 4 | Medium | Android's maskable mark looked about 20% smaller than the others (0.8). | Fixed | 0.95: reach 35.2 of the 40 safe circle. |
+| 5 | Low | Proportions: the ring was the lightest part. | Fixed | Stroke 7. |
+| 6 | Low | Optical centring and the mark's size in the square. | Accepted | The lower-left dot balances differently; the size (37 of 50) is in the usual range. |
+
+Unreviewed (carried): a real 1x desktop tab, a real Android launcher's
+crop, iOS dark and tinted home-screen icons, the Android splash in dark
+mode.

@@ -83,15 +83,23 @@ test("the corners: iPhone opaque, tab icon rounded (see-through), maskable full-
   expect(await iconPixel(page, "icon-maskable-512.png", 0, 0)).toEqual(COBALT);
 });
 
-test("the network mark is drawn: a white hub and rings, smaller on the maskable icon", async ({ page }) => {
+test("the orbit mark is drawn: a white centre dot, ring and small dot, smaller on the maskable icon", async ({ page }) => {
   await page.goto("/login");
-  for (const file of ["icon-512.png", "apple-touch-icon.png"]) {
-    expect(await iconPixel(page, file, 50, 50), `${file} hub`).toEqual(WHITE);
-    expect(await iconPixel(page, file, 30.1, 25.8), `${file} top-left ring`).toEqual(WHITE);
-    expect(await iconPixel(page, file, 21.9, 25.8), `${file} inside the ring`).toEqual(COBALT);
+  // Points along the line to the small dot (30 degrees below the left).
+  const along = (radius: number, k = 1): [number, number] => [50 - radius * k * Math.cos(Math.PI / 6), 50 + radius * k * Math.sin(Math.PI / 6)];
+  for (const file of ["icon-192.png", "icon-512.png", "apple-touch-icon.png"]) {
+    expect(await iconPixel(page, file, 50, 50), `${file} centre dot`).toEqual(WHITE);
+    expect(await iconPixel(page, file, 50, 22), `${file} ring, at the top`).toEqual(WHITE);
+    expect(await iconPixel(page, file, 50, 78), `${file} ring, at the bottom (unbroken)`).toEqual(WHITE);
+    expect(await iconPixel(page, file, 50, 36), `${file} between the dot and the ring`).toEqual(COBALT);
+    expect(await iconPixel(page, file, ...along(28)), `${file} small dot`).toEqual(WHITE);
+    // The small dot shows outside the ring (whose outer edge is at 31.5).
+    expect(await iconPixel(page, file, ...along(35)), `${file} small dot, past the ring`).toEqual(WHITE);
+    expect(await iconPixel(page, file, ...along(40)), `${file} field beyond the small dot`).toEqual(COBALT);
   }
-  // Maskable: scaled by 0.8 about the centre. Where the full-size ring's
-  // left edge would be is field; the scaled ring's right edge is white.
-  expect(await iconPixel(page, "icon-maskable-512.png", 13.7, 25.8), "maskable, unscaled ring").toEqual(COBALT);
-  expect(await iconPixel(page, "icon-maskable-512.png", 34.1, 30.6), "maskable, scaled ring").toEqual(WHITE);
+  // Maskable: scaled by 0.95 about the centre. Where the full-size ring's
+  // top edge would be is field; the scaled ring and dot are white.
+  expect(await iconPixel(page, "icon-maskable-512.png", 50, 19.2), "maskable, unscaled ring").toEqual(COBALT);
+  expect(await iconPixel(page, "icon-maskable-512.png", 50, 50 - 28 * 0.95), "maskable, scaled ring").toEqual(WHITE);
+  expect(await iconPixel(page, "icon-maskable-512.png", ...along(28, 0.95)), "maskable, scaled small dot").toEqual(WHITE);
 });

@@ -7,7 +7,7 @@ import { reseedDemo } from "./seed";
 export async function signInDemo(page: Page) {
   await page.goto("/login");
   // Playwright reuses whatever answers on the port: make sure it's this app
-  // (another app's server on 3200 once passed itself off as Network).
+  // (another app's server on 3200 once passed itself off as this one).
   await expect(page.getByRole("heading", { level: 1, name: APP_NAME })).toBeVisible();
   await page.getByRole("button", { name: "Try the demo" }).click();
   await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
