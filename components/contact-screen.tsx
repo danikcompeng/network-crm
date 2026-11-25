@@ -7,7 +7,11 @@
 
 import { useId, useState } from "react";
 import Link from "next/link";
+import { ApplicationDialog } from "@/components/application-dialog";
+import { ApplicationRowView } from "@/components/applications-screen";
 import { ContactDialog } from "@/components/contact-dialog";
+import { PlusIcon } from "@/components/icons";
+import { applicationOrder, type ApplicationRow } from "@/lib/applications";
 import { StageChip } from "@/components/stage-chip";
 import { Button } from "@/components/ui/button";
 import { INTERACTION_LABELS, TIMELINE_LIMIT } from "@/lib/crm";
@@ -18,8 +22,10 @@ import { chainAbove, introductions } from "@/lib/network";
 import { byName } from "@/lib/people";
 
 export function ContactScreen({ data, today }: { data: ContactPageData; today: string }) {
-  const { contact, people, timeline, interactionCount, applicationCount } = data;
+  const { contact, people, timeline, interactionCount, applications } = data;
   const [editing, setEditing] = useState(false);
+  const [addingApplication, setAddingApplication] = useState(false);
+  const [openApplication, setOpenApplication] = useState<ApplicationRow | null>(null);
 
   const links = people.map((p) => ({ id: p.id, introducedBy: p.introduced_by }));
   const byId = new Map(people.map((p) => [p.id, p]));
@@ -93,6 +99,24 @@ export function ContactScreen({ data, today }: { data: ContactPageData; today: s
           </Card>
         )}
 
+        <Card title="Applications">
+          {applications.length === 0 ? (
+            <p className="text-ink-muted">None linked to {contact.name}.</p>
+          ) : (
+            <ul className="-mx-4 -mb-1">
+              {[...applications].sort(applicationOrder(today)).map((a) => (
+                <li key={a.id} className="border-b border-line last:border-b-0">
+                  <ApplicationRowView application={a} person={null} today={today} onOpen={() => setOpenApplication(a)} />
+                </li>
+              ))}
+            </ul>
+          )}
+          <Button variant="ghost" size="sm" block={false} className="-ml-3 mt-2" onClick={() => setAddingApplication(true)}>
+            <PlusIcon size={18} />
+            Add application
+          </Button>
+        </Card>
+
         {contact.notes && (
           <Card title="Notes">
             {/* Plain text: nothing in a note can run as HTML. */}
@@ -128,13 +152,27 @@ export function ContactScreen({ data, today }: { data: ContactPageData; today: s
         </Card>
       </div>
 
+      <ApplicationDialog
+        open={addingApplication}
+        onClose={() => setAddingApplication(false)}
+        today={today}
+        people={people}
+        contactId={contact.id}
+      />
+      <ApplicationDialog
+        open={openApplication !== null}
+        onClose={() => setOpenApplication(null)}
+        today={today}
+        people={people}
+        application={openApplication ?? undefined}
+      />
       <ContactDialog
         open={editing}
         onClose={() => setEditing(false)}
         today={today}
         people={people}
         contact={contact}
-        deleteInfo={{ interactions: interactionCount, introduced: introduced.map((p) => p.name), applications: applicationCount }}
+        deleteInfo={{ interactions: interactionCount, introduced: introduced.map((p) => p.name), applications: applications.length }}
       />
     </>
   );

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { addDays, daysBetween, todayIn } from "./dates";
-import { LIMITS, isInteractionKind, isStage } from "./crm";
+import { APPLICATION_STATUSES, LIMITS, isInteractionKind, isStage } from "./crm";
+import { tidyLink } from "./import";
 import {
+  DEMO_APPLICATIONS,
   DEMO_PEOPLE,
   RESEED_AFTER_MS,
   SEED_DB_AT_KEY,
@@ -69,6 +71,36 @@ describe("the sample network", () => {
     expect(count((n) => n !== undefined && n >= 1 && n <= 7)).toBeGreaterThanOrEqual(4);
     expect(count((n) => n !== undefined && n > 7)).toBeGreaterThanOrEqual(2);
     expect(count((n) => n === undefined)).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("the sample applications", () => {
+  it("are 15, cover every status, and only name people who exist", () => {
+    expect(DEMO_APPLICATIONS).toHaveLength(15);
+    expect(new Set(DEMO_APPLICATIONS.map((a) => a.status))).toEqual(new Set(APPLICATION_STATUSES));
+    const keys = new Set(DEMO_PEOPLE.map((p) => p.key));
+    for (const a of DEMO_APPLICATIONS) if (a.contact) expect(keys, a.company).toContain(a.contact);
+  });
+
+  it("saved ones have no applied date; sent ones do, never in the future; links are web links", () => {
+    for (const a of DEMO_APPLICATIONS) {
+      if (a.status === "saved") expect(a.appliedDaysAgo, a.company).toBeUndefined();
+      else expect(a.appliedDaysAgo, a.company).toBeGreaterThan(0);
+      if (a.link) expect(tidyLink(a.link)).toBe(a.link);
+      expect(a.company.length).toBeLessThanOrEqual(LIMITS.applicationCompany);
+      expect(a.role.length).toBeLessThanOrEqual(LIMITS.applicationRole);
+    }
+  });
+
+  it("tell the same story as the people (Omar's offer, Riya's interview), and the tiles read 12 sent, 5 in process, 1 offer", () => {
+    const tiles = { sent: 0, inProcess: 0, offers: 0 };
+    for (const a of DEMO_APPLICATIONS) {
+      if (a.status !== "saved") tiles.sent += 1;
+      if (a.status === "online_assessment" || a.status === "interviewing") tiles.inProcess += 1;
+      if (a.status === "offer") tiles.offers += 1;
+    }
+    expect(tiles).toEqual({ sent: 12, inProcess: 5, offers: 1 });
+    expect(payload.applications.find((a) => a.company === "Brightline Energy")).toMatchObject({ contact: "omar", status: "offer" });
   });
 });
 

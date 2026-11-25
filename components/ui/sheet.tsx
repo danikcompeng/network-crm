@@ -57,7 +57,10 @@ export function Sheet({ open, onClose, title, busy = false, children, footer }: 
       }}
       onClose={() => {
         if (open) onClose();
-        (opener.current as HTMLElement | null)?.focus?.();
+        const back = opener.current as HTMLElement | null;
+        // What opened it may be gone (a deleted row, an empty state that filled up).
+        if (back?.isConnected) back.focus();
+        else document.querySelector<HTMLElement>("main:not([hidden]) h1")?.focus();
       }}
       className={
         "m-0 h-dvh max-h-none w-full max-w-none bg-background p-0 text-ink backdrop:bg-scrim " +

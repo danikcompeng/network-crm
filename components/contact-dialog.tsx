@@ -129,7 +129,13 @@ export function ContactDialog({ open, onClose, today, people, contact, deleteInf
     const checked = checkContact(shown, { id: contact?.id ?? null, today });
     if (!checked.ok) return showErrors(checked.fieldErrors);
     startTransition(async () => {
-      const result = contact ? await updateContact(contact.id, openedAt, shown) : await createContact(shown);
+      let result: Awaited<ReturnType<typeof createContact>>;
+      try {
+        result = contact ? await updateContact(contact.id, openedAt, shown) : await createContact(shown);
+      } catch {
+        setMessage("Couldn't save. Check your connection and try again.");
+        return;
+      }
       if (result.ok) {
         onClose();
         if (!contact) router.push(`/people/${result.id}`);

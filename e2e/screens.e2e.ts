@@ -104,3 +104,57 @@ test("people screens", async ({ page }) => {
     await reseedDemo();
   }
 });
+
+test("applications screens", async ({ page }) => {
+  const folder = "feature-3";
+  await freshDemo(page, "/applications");
+  await expect(page.getByRole("button", { name: "12 Sent" })).toBeVisible();
+  await shoot(page, folder, "applications");
+  await shoot(page, folder, "applications-full", { fullPage: true });
+
+  await page.getByRole("button", { name: "5 In process" }).click();
+  await shoot(page, folder, "applications-in-process");
+  await page.getByRole("button", { name: "5 In process" }).click();
+
+  await page.getByRole("button", { name: /^Kestrel Systems Firmware/ }).click();
+  await expect(page.getByRole("dialog", { name: "Edit Firmware Engineering Intern" })).toBeVisible();
+  await shoot(page, folder, "application-edit");
+  await page.getByRole("dialog", { name: "Edit Firmware Engineering Intern" }).getByRole("button", { name: "Cancel" }).click();
+
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await shoot(page, folder, "application-add");
+  await page.getByRole("dialog", { name: "Add an application" }).getByRole("button", { name: "Cancel" }).click();
+
+  const sheet = [
+    "Company Name\tPosition Title\tDate Applied\tStatus\tJob Link",
+    "Kestrel Systems\tFirmware Engineering Intern\t\tInterview\t",
+    "Juniper Robotics\tPerception Intern\t11/03/2026\tOA\twww.juniper.example/jobs/7",
+    "Aster Labs\tSoftware Intern\t11/05/2026\tmaybe later\t",
+    "Bad Row\t\t\tApplied\t",
+  ].join("\n");
+  await page.getByRole("button", { name: "Import" }).click();
+  const importer = page.getByRole("dialog", { name: "Import applications" });
+  await shoot(page, folder, "import-empty");
+  await importer.getByRole("textbox", { name: "Paste rows from a spreadsheet or a CSV file" }).fill(sheet);
+  await expect(importer.getByRole("status")).toContainText("to import");
+  await shoot(page, folder, "import-preview");
+  await importer.getByRole("heading", { name: "Preview" }).scrollIntoViewIfNeeded();
+  await importer.getByRole("status").scrollIntoViewIfNeeded();
+  await shoot(page, folder, "import-preview-rows");
+  await importer.getByRole("button", { name: "Cancel" }).click();
+
+  await page.goto("/people");
+  await page.getByRole("link", { name: /^Riya Patel/ }).click();
+  await page.getByRole("region", { name: "Applications" }).scrollIntoViewIfNeeded();
+  await shoot(page, folder, "person-applications");
+
+  try {
+    const { contacts, interactions } = await import("../lib/demo-seed").then((m) => m.demoSeedPayload("2026-11-24", "UTC"));
+    await reseedDemo({ contacts, interactions, applications: [] });
+    await page.goto("/applications");
+    await expect(page.getByText(/No applications yet/)).toBeVisible();
+    await shoot(page, folder, "applications-empty");
+  } finally {
+    await reseedDemo();
+  }
+});

@@ -166,3 +166,13 @@ export function ChevronDownIcon(props: IconProps) {
     </Icon>
   );
 }
+
+/** A box with an arrow leaving it: the link opens somewhere else. */
+export function ExternalIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M13.5 5.5H18.5V10.5M18.5 5.5L11 13" />
+      <path d="M17 13.5V18a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h4.5" />
+    </Icon>
+  );
+}

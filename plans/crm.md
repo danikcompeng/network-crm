@@ -655,6 +655,69 @@ Northwind → Marcus, Tidewater → Jasmine, Brightline → Omar's offer), a
 couple saved with deadlines (one passed). The reseed function already
 takes applications; the self-healing check counts them.
 
+**Decided after the logic check** (these replace the bullets above
+where they disagree; no migration is needed):
+- **Tiles are "Sent", "In process" and "Offers"** (not "Applied" /
+  "Interviewing", which are also chip names meaning one status). Each has
+  its own filter value (`?status=sent|in_process|offers`); they count the
+  current status of what matches the search _(logic-checker #11)_.
+- **Import duplicates are checked again on the server** against the
+  account's applications at that moment, so a retried or repeated import
+  adds nothing twice ("52 were already in your list")
+  _(logic-checker #1)_. A duplicate is the same company + role + applied
+  date (folded; no date counts as the same), so applying to one role in
+  two seasons isn't one. Each duplicate row in the preview has an
+  "Import anyway" box _(logic-checker #3)_.
+- **Status words**: folded, whole words, in a fixed order: "not / no
+  + interview / offer / selected" and rejections first, "no response /
+  pending / waiting" → applied, "declined the offer / turned down" →
+  withdrawn, then offer, interviewing, assessment, applied, saved. A word
+  it can't read becomes Applied **and is copied into the notes** ("Status
+  in the sheet: maybe?"), so nothing is lost _(logic-checker #2)_.
+- **Headers** match by the words a cell contains ("Company Name", "Date
+  Applied", "Job Link"), checked link → deadline → date → status →
+  location → notes → role → company; a row is headers when it names both
+  a company and a role column. The preview has a **picker on every
+  column** (including "Ignore"), and lists ignored columns
+  _(logic-checker #4)_.
+- **Quick status change** is guarded by the row's `updated_at` (read and
+  updated in one guarded step on the server, which also applies the
+  leaving-saved rule from the row as it is then), returns the new stamp,
+  and runs one save per row at a time, keeping only the latest choice, a
+  moment after the last change (so arrowing through a keyboard-focused
+  select saves once) _(logic-checker #5)_.
+- **Rows**: the opener is its own button (company + role); the status
+  select and the link sit beside it, never inside it
+  _(logic-checker #6)_. Sheets take their ids from `useId()`
+  _(logic-checker #7, also fixed in Feature 2)_.
+- **Room and error words**: the preview knows how many more fit (1,000
+  minus what you have) and refuses an import that doesn't; the actions
+  map `54000`, `23503`, `23514` to words; every inserted row is built
+  from one fixed column list with explicit nulls, and the app's checks
+  are stricter than the database's (links normalised through `URL`, no
+  whitespace) _(logic-checker #8, #13, #14)_.
+- **Tab-separated quotes**: a quote opens a quoted cell only if a
+  closing quote is followed by a tab, a line end or the end; otherwise
+  it's text (`"Rockstar" Intern`) _(logic-checker #9)_.
+- **Day/month**: decided once for the whole paste by the slash dates'
+  evidence (the majority); rows that contradict it are problems; when
+  nothing decides, the preview offers a Month/day · Day/month switch
+  _(logic-checker #10)_. "Nov 24" with no year is the latest such day not
+  after today for an applied date, the next one from today for a
+  deadline; "Monday, November 24, 2026" is read; an applied date after
+  today is a problem.
+- **Size**: at most 500 rows and about 900 KB per import (the server
+  action body limit is 1 MB), refused with words _(logic-checker #12)_.
+- **Sheet details**: changing a saved application's status in the sheet
+  fills applied on with today (same rule); applied on follows today until
+  touched; a contact's page has "Add application" with the person filled
+  in; saved rows order upcoming deadlines first (soonest), then none, then
+  passed ones; "Deadline today"; one shared live region for row saves
+  _(logic-checker #15)_.
+- **Demo seed**: 15 applications consistent with the people's stories
+  (applied before the first related interaction, never after today, an
+  explicit status on every row) _(logic-checker #16)_.
+
 **Pure modules (tested):** `lib/applications.ts` (counts, order, filter,
 search, the leaving-saved rule, status tones), `lib/application-input.ts`
 (the sheet's checks, link tidying), `lib/import.ts` (parsing, columns,
@@ -670,6 +733,138 @@ updated_at guard); Playwright: counts and filters on the demo, a quick
 status change, add / edit / delete, the contact page's card, and a
 paste-import of a small spreadsheet copy (then the demo is put back);
 axe in light and dark.
+
+### Feature 4: Interactions, follow-ups and Today
+
+**Goal:** open the app, see who to follow up with, log it in two taps,
+and set the next follow-up without thinking. Reference: the Today and
+person-sheet mocks in `design/tempo/` (kept out of the repo: they show
+someone else's tool).
+
+**Today replaces Home at `/`**; the tab bar becomes Today · People ·
+Applications (Map joins in Feature 5). Who's logged in, Reset demo and
+Log out move to a quiet footer at the end of Today.
+
+**The screen, top to bottom:**
+1. The date ("Tuesday, November 24", from the server's `today`) and the
+   title **Today**.
+2. Three tiles from the applications (Sent / In process / Offers, the
+   same definitions as Feature 3), each a link to that filter.
+3. **Follow up**: everyone whose follow-up is **today or overdue**, most
+   overdue first, then by name; the count on the right ("4 due"). Each a
+   card: initials (decorative), name, company · role, how you met, a
+   badge "Overdue · 9 days" (danger, words) or "Today", "Last contact 23
+   days ago" (from `crm_contact_stats`; "No contact yet"), and a **Log**
+   button. Parked people with a follow-up appear too: the follow-up is
+   their explicit ask.
+4. **Coming up**: follow-ups in the next 7 days (`lib/follow-up.ts`'s
+   `soon` bucket: today + 1 … today + 7), soonest first, one compact row
+   each with its day ("Tomorrow", "Thu, Nov 27").
+5. Empty states: nothing due ("Nothing to follow up today" and, if any,
+   "Next: Kofi Mensah, Dec 8"); no follow-ups set at all (a sentence on
+   what follow-ups are, and a link to People); no people yet (to People).
+- Tapping a card (not Log) opens the **person sheet**: name, role ·
+  company, how met, notes, the latest 5 interactions, "Open their page",
+  and **Log interaction**.
+
+**Logging, in two taps** (`components/log-sheet.tsx`, from a card's
+Log, the person sheet, or a person's page):
+- The sheet shows six kind buttons (Message, Email, Call, Meeting,
+  Applied, Other). **Tapping one logs it at once**, dated today, with no
+  note: Log + kind = two taps. Before choosing, "Add a note or another
+  day" opens a note (≤ 1,000) and a day (≤ today) that the kind button
+  then uses.
+- The server action `logInteraction(contactId, kind, note?, day?)`
+  checks everything and calls `crm_log_interaction` (one transaction:
+  inserts the interaction, and clears the follow-up if it was due on or
+  before that day, remembering it for undo). **The day is the server's
+  `userToday()` at the moment of the tap** unless a day was chosen; a
+  chosen day after today is refused. So a screen drawn at 23:55 and
+  tapped at 00:05 logs the new day (the call happened then).
+- After logging, the sheet says "Logged a call with Riya Patel" and
+  offers, in one step:
+  - **Undo** (`crm_undo_interaction`: deletes it and puts the cleared
+    follow-up back unless something newer replaced it).
+  - **The next follow-up**: a date prefilled to the logged day + 7
+    (editable, today or later), **Set follow-up** / **Not now**. If they
+    still have a follow-up after the log (it was later than the log), the
+    offer says "Move it from Dec 9 to Dec 1?" and Not now keeps Dec 9.
+  - Setting it is guarded: `setFollowUp(contactId, day, expected)`
+    updates only if the follow-up is still what the sheet saw (`expected`
+    = the value after the log, often none): a change from another tab is
+    refused with words, never overwritten.
+- Logging refreshes the page: the card leaves "Follow up" (its follow-up
+  was cleared) and, if a new one is set within 7 days, appears under
+  "Coming up".
+
+**On a person's page**: a **Log interaction** button under their name,
+and each timeline entry can be deleted (the same undo function, with a
+confirmation: "Delete this call from Nov 13?"), which puts back a
+follow-up it had resolved, by the database's rule.
+
+**Decided after the logic check** (these replace the bullets above
+where they disagree; no migration is needed):
+- **Undo undoes everything the sheet did** _(logic-checker #1)_: if
+  "Set follow-up" was pressed after logging, Undo first puts the
+  follow-up back to what it was right after the log (guarded: only if
+  it's still the day the sheet set), then deletes the interaction through
+  `crm_undo_interaction` (which brings back the follow-up the log had
+  cleared). If the second step fails, you're left "logged, nothing set",
+  and Undo can be pressed again.
+- **The sheets belong to the Today screen, not to a card**
+  _(logic-checker #2)_: logging clears the follow-up, so the card leaves
+  "Follow up" at once; the sheet (and its result: Undo, the offer) must
+  outlive it. The person sheet loads its own data when it opens (a server
+  action: notes, the current follow-up, the latest 5 interactions), so it
+  works for anyone, including someone who just left Today's lists.
+  Coming-up rows open it too.
+- **`setFollowUp` guard**: `is null` when nothing was set, `eq` otherwise,
+  `.select("id")` to tell a refusal from success, changed vs gone in words
+  _(logic-checker #3)_.
+- **The offer works only from the server's answer**: `logInteraction`
+  returns the day it used, the server's today, and a fresh read of the
+  follow-up after the log; the offer is built from those
+  _(logic-checker #4)_. A day is sent only if you **changed** it in "Add
+  a note or another day"; otherwise the server's today at the tap
+  _(logic-checker #5)_.
+- **A back-dated log** suggests its day + 7, or today + 7 if that would
+  be in the past (tested) _(logic-checker #6)_.
+- **Clear or move a follow-up from the person sheet** without logging
+  anything (the same guarded `setFollowUp`, null allowed), so a parked
+  person's old follow-up isn't stuck as overdue forever; parked cards show
+  their stage word _(logic-checker #7)_.
+- **One log per tap**: all six kind buttons are disabled from the first
+  tap until the answer _(logic-checker #8)_.
+- **Applications follows its address**: a tile link from Today
+  (`/applications?status=offers`) changes the filter of an Applications
+  page kept alive in the background _(logic-checker #9)_.
+- **Deleting a timeline entry** says when it would bring back a follow-up
+  it had resolved ("This puts back the Nov 12 follow-up")
+  _(logic-checker #11)_.
+- **One set of words**: the due badge uses `followUpLabel` ("9 days
+  overdue", "Today"), as People does; "Last contact" treats a day after
+  today as today _(logic-checker #12)_. Errors for P0002, 54000, 23514
+  in words _(logic-checker #13)_. The sheets reset when they open
+  _(logic-checker #14)_. The "Next: …" hint shows only when Follow up and
+  Coming up are both empty.
+
+**Pure modules (tested):** `lib/today.ts` (who's in Follow up and Coming
+up, their order, "Overdue · 9 days", "Last contact 23 days ago", the
+"Next:" hint, initials from any name: "José Álvarez" → "JÁ", "Leo" → "L",
+an emoji-led name → its first two letters), `lib/log-offer.ts` (the
+follow-up offer after a log: suggested day, whether it moves an existing
+one, the words), `lib/interaction-input.ts` (kind, note, day checks).
+
+**Tests:** unit for all of the above, including bucket edges (today − 1,
+today, today + 7, today + 8), a log dated before a follow-up not clearing
+it, the offer when a later follow-up remains, and initials; server
+actions with mocked Supabase (unknown kind, a day after today, a missing
+contact, the `setFollowUp` guard, undo); PGlite already covers the two
+functions. Playwright: log a call for Riya in two taps → she leaves
+Follow up → set the follow-up (+7) → she's under Coming up → Undo brings
+her back as due today; the person sheet; logging from a person's page
+and deleting a timeline entry; a stale follow-up set refused; axe in
+light and dark.
 
 ## Reviews
 
@@ -804,3 +999,70 @@ Verdict: **Ship after fixes**
 | 13 | Low | Straight apostrophes; hint placement differs between fields. | Fixed | Curly quotes; field hints under the field, muted (rule in Design direction). |
 
 Unreviewed (carried): skeletons (still `surface-sunk`), the person page with no follow-up / no notes, "Showing the latest 100", the sheet's server error, pressed states, the wide-screen sheet, iOS native pickers.
+
+### Feature 3: Internship applications (2026-11-24)
+
+#### logic-checker (plan review)
+Verdict: **Ready after fixes**. No database change needed: every column the feature writes is already granted, a bulk insert is one statement, the limit trigger sees the earlier rows of the same insert.
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | High | A retried import (lost response, two tabs, a preserved page) inserts the whole batch again: duplicates were only checked in the preview. | Fixed | The server action re-reads what's saved and drops duplicates (unless "Import anyway"); a repeat imports nothing (unit + e2e). |
+| 2 | High | Status matching undefined; substring matching turns "No offer" into an offer. | Fixed | Folded whole words in a fixed order, negatives first; 22 tricky phrases tested; an unreadable status is kept in the notes. |
+| 3 | Medium | company + role is too coarse within one paste (same role, two seasons). | Fixed | Duplicate = company + role + applied date (unknown matches any); "Import anyway" per row. |
+| 4 | Medium | Exact header names only ("Company Name", "Date Applied" missed); no way to fix a wrong mapping. | Fixed | Headers matched by contained words in a fixed order; a picker on every column; headers need both company and role. |
+| 5 | Medium | Quick status change: what "shown" means, applied_on overwrites (PostgREST can't coalesce), arrow keys saving every step. | Fixed | Guarded by the row's `updated_at`, the rule applied from the row read in the same guarded step, per-row sequencing with the latest stamp, saved 600 ms after the last change. |
+| 6 | Medium | A tappable row can't contain the select and the link (nested interactive). | Fixed | The opener is its own button; select and link are siblings. |
+| 7 | Medium | Two sheets on one page shared `id="sheet-title"`. | Fixed | `useId()` in `Sheet` (also fixes Feature 2 latent issue). |
+| 8 | Medium | No room check (a 500-row import into 600 applications fails whole); 54000/23503/23514 unmapped. | Fixed | Preview and action check the room; errors mapped; "Nothing was saved." |
+| 9 | Medium | A leading quote in a tab-separated cell (`"Rockstar" Intern`) would swallow the rest of the paste. | Fixed | In tab mode a quote opens a cell only if it closes before a tab/line end (tested). |
+| 10 | Medium | Day/month per column, conflicts undefined, no way to flip. | Fixed | One order per paste by majority evidence; the minority are problems; a Month/day · Day/month switch when nothing decides. |
+| 11 | Medium | Tiles named like chips meant different things. | Fixed | Tiles are Sent / In process / Offers with their own filter values; they follow the search and count current status. |
+| 12 | Low | 500 long rows can exceed the 1 MB server-action body. | Fixed | ~900 KB cap with words. |
+| 13 | Low | Bulk insert fills missing keys with null. | Fixed | Rows built from one fixed column list with explicit nulls (tested). |
+| 14 | Low | Undecided formats (no year, weekday prefix, "Sept"), link edge cases. | Fixed | Read and tested; no-year leans past for applied, future for deadlines; links normalised through `URL`. |
+| 15 | Low | Sheet details: saved→applied in the sheet, applied-on following today, add from a person's page, passed deadlines sorting on top forever, "Deadline today", one live region. | Fixed | All as listed in "Decided after the logic check". |
+| 16 | Low | Demo applications must match the people's stories. | Fixed | 15 seeded, every status, tested against the people. |
+
+Open questions answered: duplicate = company + role + date with an override; tiles count current status and follow the search; separate tile filters; applied dates can't be in the future; deadlines show only for saved rows; "declined" alone is a rejection, "declined the offer" a withdrawal; add from a person's page: yes; 501 rows: refused.
+
+#### code-reviewer (diff review)
+Verdict: **Ship after fixes**. Auth, the nine-column payloads, the guarded status change, the single-statement import with a server-side duplicate check, and links (http/https only, `noopener`) all checked fine; none of Feature 2's mistakes repeated.
+
+| # | Severity | Finding (file) | Outcome | What changed |
+|---|----------|----------------|---------|--------------|
+| 1 | High | A quick status change whose call itself fails (offline, a dropped connection) left the row "running" forever, showing a status that was never saved. (applications-screen.tsx) | Fixed | The queue moved to `lib/quick-status.ts` with try/finally: a failed call rolls the row back and says so, and the row keeps working; an old timer can't start a newer save. Six fake-timer tests, including the offline case. |
+| 2 | Medium | Status words: "Not applied" → Applied, "Not accepted" → Offer, "Did not get an interview" → Interviewing, "Failed OA" → OA. | Fixed | An early "not applied" rule, a wider negation (up to two words between), failed/rescinded as rejections; ten more phrases tested. |
+| 3 | Medium | A quick change re-filtered/re-sorted at once, unmounting the focused select (keyboard focus to the page). | Fixed | The list keeps its order after a quick change until the filter, search or visit changes (design-critic #2 too). |
+| 4 | Medium | The per-row save logic was untestable inside a component. | Fixed | See #1. |
+| 5 | Low | An "Import anyway" row could be inserted twice on a retry. | Fixed | An exact copy of a saved row (every imported field) is always skipped (tested). |
+| 6 | Low | The row's refusal said "Close it…", but no sheet is open. | Fixed | Its own words: "…The list now shows the latest." |
+| 7 | Low | The edit sheet opened with the server row, not the row as shown after a quick change. | Fixed | Opens with the row as shown (its saved status and stamp). |
+| 8 | Low | A data row with a company named "Business Development Bank…" was taken for headers. | Fixed | Only short (≤ 3 words), digit-free cells look like headers (tested). |
+| 9 | Low | The Month/day switch showed no keyboard focus. | Fixed | Ring on the label when its radio has focus-visible. |
+| 10 | Low | Focus went to the page when what opened a sheet was gone (deleted row, filled empty state). | Fixed | Falls back to the page's heading. |
+| 11 | Low | Row numbers drifted after blank rows; in-paste duplicates said "Already in your list". | Fixed | Rows keep the physical line they start on; "Also on row 4." (tested). |
+| 12 | Low | The 900 KB cap counted characters, not the JSON bytes sent; a failed call replaced the whole screen. | Fixed | Bytes measured with `TextEncoder`; every sheet catches a failed call and keeps what you typed (people sheets too). |
+| — | Found while testing | Changing a status before the page hydrated moved the native select but never saved. | Fixed | Row selects are disabled until hydrated. |
+| — | Found while testing | A literal BOM and other invisible characters had crept into source and tests. | Fixed | Written as escapes; a scan found no others. |
+
+#### design-critic (applications, sheets, import, person card, empty; light and dark)
+Verdict: **Ship after fixes**
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | High | The row select, column pickers and paste box were 14 px: iPhones zoom in on them. | Fixed | All 16 px. |
+| 2 | High | A one-tap change could move or remove the row under your finger. | Fixed | Order frozen after a quick change; a row that left the filter says "Moved out of this filter". |
+| 3 | Medium | The select took half the row and truncated company and person. | Fixed | Controls moved to their own line under a full-width opener; the select sizes to its word. |
+| 4 | Medium | The select looked like a read-only badge. | Fixed | Drawn as a field (`edge` border, 12 px corners); the badge stays for the read-only card. |
+| 5 | Medium | The right column had no fixed position. | Fixed | Same control line in every row; Posting right-aligned with an external-link icon. |
+| 6 | Medium | Save feedback appeared off-screen and pushed the list. | Fixed | A toast above the tab bar (4 s), plus an always-mounted screen-reader status. |
+| 7 | Medium | Import looked ready with nothing to import. | Fixed | Secondary until ready; tapping it says why. |
+| 8 | Medium | Skipped preview rows looked like imported ones. | Fixed | Muted with a "Skipped" badge; "Row 2" in the meta line, no number gutter. |
+| 9 | Medium | Month/day switch: no focus ring; forced state at 60% opacity. | Fixed | Focus ring; forced is one plain sentence. |
+| 10 | Low | Native chevrons on the column pickers. | Fixed | The app's chevron. |
+| 11 | Low | Pasted rows wrapped. | Fixed | `wrap="off"`, a shorter placeholder. |
+| 12 | Low | "Deadline passed" turned the person's name red; "Deadline today" red. | Fixed | Only the date words take the tone; today is ink bold, passed danger. |
+| 13 | Low | The unchecked checkbox looked disabled in dark. | Fixed | A drawn checkbox (`edge` border, cobalt when checked). |
+| 14 | Low | The person card had an extra divider under its title. | Fixed | Removed. |
+| 15 | Low | Empty-state copy vs button order; two Northwind sheets titled alike; header overflow at 320 px. | Fixed | Copy reordered; sheets titled by role; header wraps. |

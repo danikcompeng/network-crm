@@ -1,10 +1,14 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page } from "@playwright/test";
+import { APP_NAME } from "../../lib/app-identity";
 import { reseedDemo } from "./seed";
 
 /** Signs in with "Try the demo" and waits for home. */
 export async function signInDemo(page: Page) {
   await page.goto("/login");
+  // Playwright reuses whatever answers on the port: make sure it's this app
+  // (another app's server on 3200 once passed itself off as Network).
+  await expect(page.getByRole("heading", { level: 1, name: APP_NAME })).toBeVisible();
   await page.getByRole("button", { name: "Try the demo" }).click();
   await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
 }

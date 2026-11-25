@@ -8,8 +8,8 @@ const check = (raw: Record<string, unknown>, id: string | null = null) => checkC
 
 describe("tidying", () => {
   it("a line: any whitespace run is one space, trimmed, empty is null", () => {
-    expect(tidyLine("  Sam  Okafor\t ")).toBe("Sam Okafor");
-    expect(tidyLine(" 　")).toBeNull();
+    expect(tidyLine("  Sam\u00A0\u00A0Okafor\t ")).toBe("Sam Okafor");
+    expect(tidyLine("\u2003\u3000")).toBeNull();
     expect(tidyLine(42)).toBeNull();
   });
   it("text: keeps line breaks, normalises Windows line ends, trims the ends", () => {

@@ -8,7 +8,7 @@
 // met directly, follow-ups overdue / today / this week / later / none.
 
 import { addDays, instantOnDay } from "./dates";
-import type { InteractionKind, Stage } from "./crm";
+import type { ApplicationStatus, InteractionKind, Stage } from "./crm";
 
 type SampleInteraction = { daysAgo: number; kind: InteractionKind; note?: string };
 
@@ -315,6 +315,45 @@ export const DEMO_PEOPLE: readonly SamplePerson[] = [
   },
 ];
 
+type SampleApplication = {
+  company: string;
+  role: string;
+  status: ApplicationStatus;
+  /** Days ago it was sent (none for a saved one). */
+  appliedDaysAgo?: number;
+  /** Days from today (negative: passed). */
+  deadlineIn?: number;
+  /** The key of the person tied to it. */
+  contact?: string;
+  location?: string;
+  link?: string;
+  notes?: string;
+};
+
+/**
+ * 15 applications that agree with the people's stories (Riya's interview,
+ * Jasmine's panel, Omar's offer, Marcus's screen), every status, two saved
+ * ones with deadlines (one passed) and one without. Fictional companies,
+ * .example links.
+ */
+export const DEMO_APPLICATIONS: readonly SampleApplication[] = [
+  { company: "Kestrel Systems", role: "Firmware Engineering Intern", status: "interviewing", appliedDaysAgo: 20, contact: "riya", location: "Toronto, ON", link: "https://jobs.kestrel.example/firmware-intern" },
+  { company: "Northwind Robotics", role: "Controls Software Intern", status: "interviewing", appliedDaysAgo: 48, contact: "marcus", location: "Waterloo, ON", link: "https://careers.northwind.example/controls" },
+  { company: "Northwind Robotics", role: "Hardware Test Intern", status: "withdrawn", appliedDaysAgo: 49, location: "Waterloo, ON", notes: "Withdrew to focus on the controls role." },
+  { company: "Tidewater Analytics", role: "Data Engineering Intern", status: "interviewing", appliedDaysAgo: 24, contact: "jasmine", location: "Orlando, FL" },
+  { company: "Brightline Energy", role: "Grid Software Intern", status: "offer", appliedDaysAgo: 26, contact: "omar", location: "Toronto, ON", notes: "Offer deadline in two weeks." },
+  { company: "Halcyon Labs", role: "Hardware Engineering Intern", status: "applied", appliedDaysAgo: 10, contact: "grace", location: "Toronto, ON" },
+  { company: "Maple Circuit", role: "Embedded Systems Intern", status: "online_assessment", appliedDaysAgo: 15, contact: "isabel", location: "Ottawa, ON", notes: "Coding test due by the end of the week." },
+  { company: "Silverline Semiconductors", role: "Design Verification Intern", status: "online_assessment", appliedDaysAgo: 12, location: "Ottawa, ON" },
+  { company: "Lakeshore University", role: "Undergraduate Research Assistant", status: "applied", appliedDaysAgo: 35, contact: "elena", location: "Toronto, ON" },
+  { company: "Harborview Medical Devices", role: "Firmware Intern", status: "applied", appliedDaysAgo: 7, location: "Orlando, FL", link: "https://harborview.example/careers/fw-intern" },
+  { company: "Quarry Games", role: "Engine Tools Intern", status: "rejected", appliedDaysAgo: 46, contact: "ethan", location: "Montreal, QC" },
+  { company: "Pinecrest Aerospace", role: "Avionics Software Intern", status: "rejected", appliedDaysAgo: 40, location: "Montreal, QC" },
+  { company: "Larkspur Health", role: "Biomedical Devices Intern", status: "saved", deadlineIn: 9, contact: "ben", location: "Toronto, ON" },
+  { company: "Orchard Pay", role: "Platform Engineering Intern", status: "saved", deadlineIn: -3, contact: "chloe", location: "Toronto, ON" },
+  { company: "Bluewater Transit", role: "Software Engineering Intern", status: "saved", location: "Orlando, FL" },
+];
+
 /** One contact in the payload for reseed_demo_crm. */
 export type SeedContact = {
   key: string;
@@ -330,7 +369,18 @@ export type SeedContact = {
   created_at: string;
 };
 export type SeedInteraction = { contact: string; day: string; kind: InteractionKind; note: string | null; created_at: string };
-export type SeedApplication = Record<string, unknown>;
+export type SeedApplication = {
+  company: string;
+  role: string;
+  status: ApplicationStatus;
+  applied_on: string | null;
+  deadline: string | null;
+  contact: string | null;
+  location: string | null;
+  link: string | null;
+  notes: string | null;
+  created_at: string;
+};
 export type SeedPayload = { contacts: SeedContact[]; interactions: SeedInteraction[]; applications: SeedApplication[] };
 
 /** The payload for reseed_demo_crm, dated from `today` in `timeZone`. */
@@ -354,7 +404,22 @@ export function demoSeedPayload(today: string, timeZone: string | undefined): Se
       return { contact: p.key, day, kind: i.kind, note: i.note ?? null, created_at: instantOnDay(day, timeZone).toISOString() };
     }),
   );
-  return { contacts, interactions, applications: [] };
+  const applications = DEMO_APPLICATIONS.map((a) => {
+    const appliedOn = a.appliedDaysAgo === undefined ? null : addDays(today, -a.appliedDaysAgo);
+    return {
+      company: a.company,
+      role: a.role,
+      status: a.status,
+      applied_on: appliedOn,
+      deadline: a.deadlineIn === undefined ? null : addDays(today, a.deadlineIn),
+      contact: a.contact ?? null,
+      location: a.location ?? null,
+      link: a.link ?? null,
+      notes: a.notes ?? null,
+      created_at: instantOnDay(appliedOn ?? addDays(today, -5), timeZone).toISOString(),
+    };
+  });
+  return { contacts, interactions, applications };
 }
 
 /** How long the sample data lasts before the next demo sign-in puts it back. */

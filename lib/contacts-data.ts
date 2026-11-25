@@ -6,7 +6,11 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EditableContact, PersonOption } from "@/components/contact-dialog";
 import { TIMELINE_LIMIT, type InteractionKind } from "./crm";
+import type { ApplicationRow } from "./applications";
 import type { PersonRow } from "./people";
+
+/** The columns every application view reads. */
+export const APPLICATION_FIELDS = "id, company, role, status, applied_on, deadline, link, location, contact_id, notes, updated_at";
 
 export type ListPerson = PersonRow & { last_day: string | null };
 
@@ -37,7 +41,8 @@ export type ContactPageData = {
   people: PersonOption[];
   timeline: TimelineEntry[];
   interactionCount: number;
-  applicationCount: number;
+  /** Their applications (the card on their page; the delete summary counts them). */
+  applications: ApplicationRow[];
 };
 
 /** One person and everything their page shows, or null if they aren't yours (or don't exist). */
@@ -57,7 +62,7 @@ export async function loadContact(supabase: SupabaseClient, id: string): Promise
       .order("created_at", { ascending: false })
       .limit(TIMELINE_LIMIT),
     supabase.from("crm_interactions").select("id", { count: "exact", head: true }).eq("contact_id", id),
-    supabase.from("crm_applications").select("id", { count: "exact", head: true }).eq("contact_id", id),
+    supabase.from("crm_applications").select(APPLICATION_FIELDS).eq("contact_id", id).limit(1000),
   ]);
   for (const [where, result] of [
     ["Contact", contact],
@@ -74,6 +79,17 @@ export async function loadContact(supabase: SupabaseClient, id: string): Promise
     people: people.data as PersonOption[],
     timeline: timeline.data as TimelineEntry[],
     interactionCount: interactions.count ?? 0,
-    applicationCount: applications.count ?? 0,
+    applications: applications.data as unknown as ApplicationRow[],
   };
+}
+
+/** Every application (at most 1,000: one request), and everyone, for the person picker and names. */
+export async function loadApplications(supabase: SupabaseClient): Promise<{ applications: ApplicationRow[]; people: PersonOption[] }> {
+  const [applications, people] = await Promise.all([
+    supabase.from("crm_applications").select(APPLICATION_FIELDS).limit(1000),
+    supabase.from("crm_contacts").select("id, name, company, introduced_by").limit(1000),
+  ]);
+  if (applications.error) fail("Applications", applications.error);
+  if (people.error) fail("Applications: people", people.error);
+  return { applications: applications.data as unknown as ApplicationRow[], people: people.data as PersonOption[] };
 }
