@@ -924,6 +924,57 @@ introduced you to whom, you're in the middle, and you can watch it grow.
   mid-range phone; above 400, the simulation runs in chunks between frames
   so the page never freezes.
 
+**Decided after the logic check** (these replace the bullets above
+where they disagree; no migration is needed):
+- **Layout: a radial tree, settled by d3-force** _(logic-checker "simpler
+  approach", #1, #3, #12)_. Starting positions are rings by depth from
+  You, each person's sector sized by how many people hang below them,
+  children ordered by the day you met them, then name. Then a short,
+  fixed d3-force run (stopped at creation, driven only by `tick(120)`,
+  fresh node objects every time): links, weak repulsion, collision at a
+  **constant** radius, and a radial pull to each ring. Input is sorted by
+  id, so the same data always gives the same picture **on one device**;
+  interaction counts never move anyone; adding someone mostly moves their
+  own branch. Lines run outward, so who introduced whom reads from the
+  picture.
+- **Computed once per shape of the network** _(#2)_: the positions are
+  cached by a key of the sorted ids and introducers (a module cache, so
+  `<Activity>` and refreshes don't recompute), the 600 ms ease plays only
+  the first time a layout is seen, pan and zoom survive coming back.
+- **Everyone is on the map and in the list, exactly once** _(#5)_: after
+  walking out from You, anyone not reached (only possible through a loop
+  the database refuses) is hung off You, the loop cut at its lowest id
+  (tested).
+- **Phone**: the map is a fixed frame (about 60% of the screen), the page
+  still scrolls around it; `touch-action: none` only inside it; the wheel
+  listener is attached natively and non-passive _(#4)_. The smallest zoom
+  is whatever fits everyone (at most 0.4×) _(#6)_.
+- **Dots and labels keep their size on screen** while positions zoom;
+  a tap picks the nearest dot within 22 px of the finger _(#7)_.
+- **Dots** are equal round plates in the surface colour, edged, sized by
+  interaction count, with the stage glyph inside in its colour, so the
+  size reads as "how much you've talked" and a parked bar never vanishes
+  _(#15)_.
+- **Labels**: placed greedily in priority (the tapped dot, then by
+  interactions, then name), skipping any that would overlap one already
+  placed; at most 14 characters; a title ("Dr.") falls back to the next
+  word _(#14)_.
+- **Growth**: each person's day is their met-on day, or the day they were
+  added **in your timezone**; nobody appears before their introducer
+  (they appear on the later of the two days); days are clamped into first
+  meeting … today; the slider's far right means everyone; the slider hides
+  when everyone shares one day _(#8, #9)_.
+- **The list is equivalent** _(#10)_: each person with company, stage
+  word and interaction count; the list and the map's summary follow the
+  slider ("On Nov 3: 5 people, 1 introduction chain"); deep chains stop
+  indenting after 4 levels (the nesting stays in the markup).
+- **Motion and speed** _(#11, #17)_: the ease is one CSS transition per
+  dot (no per-frame React work); Play steps the slider 40 times over 4 s;
+  the frame has a fixed height and shows "Laying out…" while computing;
+  the motion preference is read after hydration; the list is
+  server-rendered.
+- Closing a dot's sheet returns focus to the map's heading _(#16)_.
+
 **Pure modules (tested):** `lib/map-graph.ts` (nodes, edges, radius,
 label rule, growth by date, the grouped list, deterministic starting
 positions), `lib/map-view.ts` (pan, zoom about a point, clamping, fit to
@@ -1204,3 +1255,69 @@ Verdict: **Ship after fixes**. Matches the mock's structure; overdue as danger w
 | 13 | Low | Coming-up rows gave no cue they open something. | Fixed | A chevron. |
 
 Unreviewed (carried): the "Move it" offer, the person sheet with notes and its editor, a parked card, the person page's Log and Delete, error text in sheets, skeletons, long names in sheet titles, iOS date pickers, exit motion.
+
+### Feature 5: The network map (2026-11-25)
+
+#### logic-checker (plan review)
+Verdict: **Ready after fixes**. No migration needed: the map only reads (`met_on`, `created_at` and `crm_contact_stats()` already exist and are granted). Its "simpler approach" (a radial tree) was taken, settled by a short d3-force run.
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | High | "Same data" didn't mean the same input: row order and interaction counts (collision by radius) moved people. | Fixed | Input sorted by id; collision at a constant radius; tested with reversed input and busier contacts. |
+| 2 | High | The layout and its fly-in would rerun on every return to the tab and every refresh. | Fixed | Module cache by the network's shape; the ease plays only the first time a layout is shown; pan and zoom survive coming back. |
+| 3 | High | d3's simulation starts its own timer as soon as it's created. | Fixed | `.stop()` at creation, driven only by `tick(n)`. |
+| 4 | High | On a phone, panning the map would trap page scrolling; a passive wheel can't stop the page. | Fixed | A fixed-height frame with `touch-action: none` only inside it; a native non-passive wheel listener. |
+| 5 | Medium | A loop wouldn't hang, but would drop people. | Fixed | Anyone unreached is hung off You, the loop cut at its lowest id (tested: everyone once, on the map and in the list). |
+| 6 | Medium | A 0.4× minimum zoom can't fit 300 to 1,000 people. | Fixed | The minimum is whatever fits everyone (at most 0.4×). |
+| 7 | Medium | Dot and label sizes had no units; taps on small dots would miss. | Fixed | Sizes in screen px, constant while positions zoom; a tap takes the nearest dot within 22 px of its edge. |
+| 8 | Medium | Slider dates could hide people at the default position. | Fixed | The far right means everyone; days clamped to first meeting … today. |
+| 9 | Medium | Someone met before their introducer would show as an unlinked dot. | Fixed | They appear on the later of the two days (tested). |
+| 10 | Medium | The list wasn't equivalent to the picture. | Fixed | Company, stage and interaction count per person; the list and summary follow the slider; nesting kept in the markup at every depth. |
+| 11 | Medium | Animations would re-render thousands of SVG nodes every frame. | Fixed | One CSS transition per dot, no per-frame React work; gestures write the transform directly and commit when they end. |
+| 12 | Medium | Adding one person would reshuffle the whole map. | Fixed | The radial start (sectors by subtree) keeps changes mostly to that branch. |
+| 13 | Low | The layout probably differs between phone and laptop. | Accepted | Same on one device, as decided. |
+| 14 | Low | Labels overlap; first names are ambiguous. | Fixed | Greedy placement in priority order; titles skipped; 14 characters at most; the full name is in the sheet and the list. |
+| 15 | Low | Stage shapes distort the size encoding. | Fixed | Equal round plates sized by interactions, the stage glyph inside. |
+| 16 | Low | Focus and hosting the sheets on the map. | Fixed | Both sheets hosted by the map screen; closing a dot's sheet focuses the heading (built after code review #3). |
+| 17 | Low | Server render and first paint. | Fixed | Laid out only after hydration; the motion preference read after hydration; the list server-rendered. |
+| 18 | Low | Line direction isn't visible; some helpers already exist. | Fixed | Rings by depth make lines run outward; `summaryText` reused. |
+
+#### code-reviewer
+Verdict: **Ship after fixes**.
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | High | Lifting the last, still finger of a pinch (or a two-finger tap) counted as a tap and opened a sheet; a right-click did too. | Fixed | `Gestures` in `lib/map-view.ts`: no tap once a second pointer joined, until every pointer is up (unit tests); primary button only (e2e: right-click opens nothing). |
+| 2 | Medium | The 600 ms ease never played: `motion-safe:transition-opacity` replaced the transform transition. | Fixed | Position on an outer group, scaling and fading on an inner one; the transition is dropped once played, so zooms never lag; e2e checks it plays and ends where Reduce Motion puts the dots. |
+| 3 | Medium | Closing a dot's sheet didn't return focus to the heading (the opener was `body`). | Fixed | The map focuses its heading after a dot's sheet closes (e2e). |
+| 4 | Low | The slider didn't hide when everyone shares one day before today. | Fixed | `growthRange` is null when the first and last days are the same (tested). |
+| 5 | Low | The layout cache key ignored the sibling order (days met, names). | Fixed | The key is the drawing order itself (tested: a changed met-on changes it, interaction counts don't). |
+| 6 | Low | `pointercancel` didn't commit the view. | Fixed | It commits; every pointer-up commits. |
+| 7 | Low | The tap reach used the radius before zoom shrinks the dot. | Fixed | It uses the drawn radius. |
+| 8 | Low | The layout ran during render with a side effect, and wasn't chunked above 400. | Fixed / Changed | `first` is used up only after the screen shows it (`markShown`, tested). Instead of chunking, the settling run is halved above 400 people (measured on a laptop before halving: 300 people 0.13 s, 1,000 people 0.47 s). Chunking dropped from the plan. |
+| 9 | Low | Play restarted from the start after the page was hidden and shown. | Fixed | Its progress is kept in a ref. |
+| 10 | Low | The SVG's label didn't say which day the slider is on. | Fixed | It reads the same dated sentence as the summary. |
+| — | Tests | Pinch/tap edge cases, the ease, focus return, one-day range, cache key and `first`, the day each person appears (timezone, future met-on), self-introduction, label edge cases. | Fixed | Added (`mapDay` pulled out of `loadMap` to test it); 527 unit tests, 29 e2e. |
+
+#### design-critic (map, growing, zoomed, sheet, list, empty, playing; light and dark)
+Verdict: **Ship after fixes**.
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | High | A quarter of the people had no name at the fitted zoom (Jasmine, an interviewing contact, among them). | Fixed | Each label tries eight spots (below, right, left, above, then the diagonals) before it's dropped; 19 of 20 show at the fitted zoom, the last on zoom or tap. |
+| 2 | Medium | Labels touched dots and lines. | Fixed | 3 px between labels, 1.5 px from other dots, a 6 px halo. |
+| 3 | Medium | The cobalt slider was the loudest thing on screen. | Fixed | Own styling: `line-strong` track, `edge` fill, a surface thumb with an edge rim; cobalt only while focused or held. |
+| 4 | Medium | The zoom buttons covered part of the network. | Fixed | Fit and zoom centre on the part left of the buttons; 8 px between them. |
+| 5 | Medium | Text glyphs (+ − ⤢) for the controls; ⤢ reads as full screen. | Fixed | Line icons (plus, minus, four corner brackets) in the app's icon style. |
+| 6 | Medium | Small dots became unreadable when zoomed out. | Fixed | A dot never draws below 9 px radius (tested). |
+| 7 | Medium | The empty state's bare link failed 44 px and wasn't the app's pattern. | Fixed | A You dot, the copy, and a primary "Add a person" that opens the add sheet right there. |
+| 8 | Medium | The list didn't match People's rows. | Fixed | Two lines: semibold name; stage glyph and word · company · count; a chevron. |
+| 9 | Low | The page jumped when Play appeared after hydration. | Fixed | The row keeps 44 px either way. |
+| 10 | Low | The slider's square focus ring stuck out. | Fixed | Uses the field radius. |
+| 11 | Low | "today, everyone" read awkwardly; no sign where the range starts. | Fixed | "Today · all 20"; the first day and "Today" under the track. |
+| 12 | Low | The hint ran to two lines and said "scroll" on a phone. | Fixed | "Drag to move · pinch to zoom · tap a person". |
+| 13 | Low | The person sheet hides the tapped dot. | Deferred | The shared compact sheet sizes to its content; revisit in the polish pass. |
+
+Also fixed while testing: Next's development badge sat over the Today tab once there were four tabs (`devIndicators: false`; development only).
+
+Unreviewed (carried): "Laying out…", "No one on this day yet.", more than 40 people, the skeleton, the ease on a real phone.

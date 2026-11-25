@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, type ComponentType, type SVGProps } from "react";
-import { BriefcaseIcon, PeopleIcon, TodayIcon } from "@/components/icons";
+import { BriefcaseIcon, MapIcon, PeopleIcon, TodayIcon } from "@/components/icons";
 
 type Tab = { href: string; label: string; Icon: ComponentType<SVGProps<SVGSVGElement> & { size?: number }> };
 
@@ -15,6 +15,7 @@ export const TABS: readonly Tab[] = [
   { href: "/", label: "Today", Icon: TodayIcon },
   { href: "/people", label: "People", Icon: PeopleIcon },
   { href: "/applications", label: "Applications", Icon: BriefcaseIcon },
+  { href: "/map", label: "Map", Icon: MapIcon },
 ];
 
 /** The tab a path belongs to: "/people/123/edit" is People; "/" only matches itself. */

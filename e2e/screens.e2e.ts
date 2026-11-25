@@ -18,11 +18,11 @@ async function settle(page: Page) {
   await page.waitForTimeout(400);
 }
 
-export async function shoot(page: Page, folder: string, name: string, options: { fullPage?: boolean } = {}) {
+export async function shoot(page: Page, folder: string, name: string, options: { fullPage?: boolean; motion?: boolean } = {}) {
   // Wait until React has taken over the page (hydrated).
   await page.waitForLoadState("networkidle");
   for (const scheme of SCHEMES) {
-    await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    await page.emulateMedia({ colorScheme: scheme, reducedMotion: options.motion ? "no-preference" : "reduce" });
     await settle(page);
     await page.screenshot({ path: `docs/screenshots/${folder}/${name}-${scheme}.png`, fullPage: options.fullPage });
   }
@@ -187,4 +187,57 @@ test("applications screens", async ({ page }) => {
   } finally {
     await reseedDemo();
   }
+});
+
+test("map screens", async ({ page }) => {
+  const folder = "feature-5";
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await freshDemo(page, "/map");
+  await expect(page.locator("svg [data-node]")).toHaveCount(20);
+  await shoot(page, folder, "map");
+  // Scroll so the list's heading is at the top (it starts just behind the tab bar, which counts as "in view").
+  await page.evaluate(() => {
+    const top = document.getElementById("network-list")!.getBoundingClientRect().top;
+    window.scrollTo(0, window.scrollY + top - 20);
+  });
+  await shoot(page, folder, "map-list");
+  await page.evaluate(() => window.scrollTo(0, 0));
+
+  const slider = page.getByRole("slider", { name: /Your network on/ });
+  await slider.focus();
+  await page.keyboard.press("Home");
+  for (let i = 0; i < 25; i++) await page.keyboard.press("ArrowRight");
+  await shoot(page, folder, "map-growing");
+  await page.keyboard.press("End");
+
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await shoot(page, folder, "map-zoomed");
+  await page.getByRole("button", { name: "Fit the whole network" }).click();
+
+  const riya = page.locator("svg [data-node]").filter({ hasText: "Riya" });
+  const box = (await riya.locator("circle").boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.getByRole("dialog", { name: "Riya Patel" })).toBeVisible();
+  await shoot(page, folder, "map-sheet");
+  await page.getByRole("dialog", { name: "Riya Patel" }).getByRole("button", { name: "Close" }).click();
+
+  try {
+    await reseedDemo({ contacts: [], interactions: [], applications: [] });
+    await page.goto("/map");
+    await expect(page.getByText(/Your map starts with you/)).toBeVisible();
+    await shoot(page, folder, "map-empty");
+  } finally {
+    await reseedDemo();
+  }
+
+  // With motion allowed: the Play button, mid-sweep.
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/map");
+  await expect(page.locator("svg [data-node]")).toHaveCount(20);
+  await page.waitForTimeout(1000);
+  await page.getByRole("button", { name: "Watch it grow" }).click();
+  await page.waitForTimeout(1500);
+  await page.getByRole("button", { name: "Stop" }).click(); // hold it mid-sweep for both shots
+  await shoot(page, folder, "map-playing", { motion: true });
 });

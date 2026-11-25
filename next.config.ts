@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
   cacheComponents: true,
+  // The dev-tools badge sits over the tab bar (bottom left, on the Today tab); errors still show.
+  devIndicators: false,
   partialPrefetching: true,
   turbopack: {
     rules: {
