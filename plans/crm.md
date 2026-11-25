@@ -1130,7 +1130,19 @@ in-app error boundary.
 ### Renamed to Orbit (2026-11-25)
 
 The user named the app **Orbit**. The repo stays `network-crm`, the
-Vercel project is `orbit-crm`, and the Map tab stays "Map".
+Vercel project is `orbit-crm` (live at https://orbit-dk.vercel.app), and
+the Map tab stays "Map".
+
+- **Production checks** (`e2e/smoke.e2e.ts`, written now: the config
+  named it but it didn't exist): with `BASE_URL=https://orbit-dk.vercel.app`
+  only it and `install.e2e.ts` run; local runs leave it out. One demo
+  sign-in, like a visitor's (it reseeds a stale demo, as theirs do):
+  logged out goes to login; the login link's landing address redirects to this
+  site's login; the login cookie is httpOnly and Secure; every tab loads
+  and the map draws; a log is saved (the server's answer, not the screen)
+  and Undo takes it back (the sheet closes, and they're due again after a
+  reload); if that fails, Reset demo, so no stray log is left for
+  visitors.
 
 - `APP_NAME = "Orbit"`: the manifest's name and short name, every page
   title ("Today · Orbit"), the iPhone home-screen title and the login
@@ -1143,22 +1155,35 @@ Vercel project is `orbit-crm`, and the Map tab stays "Map".
   repo and package name. Earlier review logs keep the name they were
   written under.
 - **The icon** didn't fit the name (a hub with spokes to three rings), so
-  it's replaced by the **orbit mark**: a solid centre dot (you), one
-  unbroken ring around it, and a small dot (a person) on the ring like a
-  bead, low on the left (150 degrees), white on the app's cobalt, no
-  letters (core 12, ring 28, stroke 7, small dot 9, in a 100 box). Not
-  cut open around the dot, and not at the upper right: that's the Ionic
-  framework's logo (design-critic). One
-  drawing (`components/orbit-mark.tsx`, geometry in `ORBIT_MARK`) is used
-  by the icon PNGs and the login screen, where it's cropped to the drawing
-  so it lines up with the text column. `ICON_VERSION` 1 → 2 so browsers
-  and Android fetch the new PNGs.
-- The maskable icon draws the mark at 0.95 (reach 35.2 of the 40 safe
-  circle; 37 of 50 on the others).
+  it's replaced by the **orbit mark**: a solid centre dot (you) and a
+  tilted, flattened orbit round it, as a planet's orbit looks seen at an
+  angle. The far half passes behind the dot and the near half in front of
+  it, across its middle (the dot shows above and below), each with a
+  2.5 gap where they meet; a small dot (a person) rides the near half like
+  a bead, with orbit running on past it. White on the app's cobalt, no
+  letters (core 16; orbit rx 37, ry 8, turned 22 degrees so its right end
+  rises; stroke 6; small dot 6.5 at 135 degrees round the orbit; in a 100
+  box, centred by its bounding box). One drawing
+  (`components/orbit-mark.tsx`, geometry in `ORBIT_MARK`) serves the icon
+  PNGs and the login screen (cropped to its bounds there, 28 px tall).
+  The gaps are SVG masks, so it works on any background; the orbit's mask
+  sits on a group, since a mask on the rotated ellipse turns with it.
+- **How it got here** (ICON_VERSION 2 → 3): a circle with a small dot on
+  it is the Ionic framework's logo, whatever the details (design-critic,
+  twice); the user asked for a tilted oval instead; a dot inside a tilted
+  oval read as an eye (design-critic); the orbit crossing the dot, behind
+  and in front, is the cue an eye never has.
+- The maskable icon draws the mark at 0.85 (inside 90% of the 40 safe
+  circle).
 - **Tests:** the drawing (constants and computed geometry) pinned to the
-  version; the dot on the ring and showing past it; the maskable reach;
-  pixels of the real PNGs (centre dot, unbroken ring, small dot past the
-  ring, the maskable scale); the login heading and title say Orbit. Screenshots of the login
+  version; the orbit tilted and flattened, crossing the dot behind and in
+  front, the dot showing below the near half, the small dot on the near
+  half (in the orbit's own frame), clear of the centre dot and short of
+  the orbit's end; centred by its bounding box; the maskable reach; the
+  paths' ends; pixels of the real PNGs computed from the same geometry
+  (centre dot, the orbit in front of it at three points, the cuts above
+  and below it, the far half stopping short, the raised end, the small
+  dot, the maskable scale); the login heading and title say Orbit. Screenshots of the login
   and an icon sheet (home screen, launcher masks, tab sizes) in
   `docs/screenshots/orbit/`.
 
@@ -1583,3 +1608,41 @@ Verdict: **Ship after fixes**, then the one open point left to the user.
 Unreviewed (carried): a real 1x desktop tab, a real Android launcher's
 crop, iOS dark and tinted home-screen icons, the Android splash in dark
 mode.
+
+#### Second round: the tilted orbit, the live address, the smoke test (2026-11-25)
+
+The user picked the icon direction (a tilted oval like a planet's orbit
+seen at an angle, to be clear of Ionic), gave the live address
+(https://orbit-dk.vercel.app) and asked for the production checks.
+
+**design-critic** (three passes on the icon)
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | High | A dot inside a tilted oval (rx 33, ry 19) reads as an eye at every size, worst at 16 px and beside "Who you met". | Fixed | The orbit crosses the dot: the far half behind it, the near half in front, with gaps (masks): a ringed planet. No eye glyph has that overlap. |
+| 2 | High | The small dot sat on the orbit's tip: a knob or a comet head, not a person on the orbit. | Fixed | Moved in to 135 degrees on the near half, r 6.5; orbit runs on past it (tested). |
+| 3 | Medium | The orbit was too flat to read as an orbit (ry/rx 0.19). | Fixed, partly | rx 37, ry 8 (0.22). Opening it further (ry 10 to 11) puts the near half across the dot's bottom edge, which reads as a dome or a hat; the dot showing below the near half is kept (tested). |
+| 4 | Medium | Weaker at tab size than the circle (stroke 5, gap 2). | Fixed, partly | Stroke 6, gap 2.5. Still no separate small favicon drawing (accepted, as before). |
+| 5 | Low | The login mark had shrunk to 24 px tall. | Fixed | 28 px tall (about 50 wide), on the text column. |
+| 6 | Low | Resemblance to a stock Saturn emoji. | Accepted | Not a trademark; the small dot on the orbit makes it "you and your people". |
+| — | Ionic | | Resolved | No longer resembles it at any size. |
+
+**code-reviewer** (two passes)
+
+| # | Severity | Finding | Outcome | What changed |
+|---|----------|---------|---------|--------------|
+| 1 | Medium | The smoke test (new) ran in local runs too and failed there: the cookie is only Secure in production. | Fixed | Left out of local runs; the Secure check follows https. |
+| 2 | Medium | No cleanup if the smoke test failed between the save and the Undo; then, the cleanup could hide the real error, or not run on a timeout. | Fixed | The save, the Undo and the check sit in one try; on failure after the save (and before a confirmed Undo) it presses Reset demo in its own try, reports a failed reset, and rethrows the original error; 120 s budget. |
+| 3 | Medium | The new pixel checks couldn't catch the V bug (they sampled where the V left white). | Fixed | The whole near half is checked every 2 degrees on every icon; with the bug put back it fails (at 64 degrees), checked. |
+| 4 | Low | The "server's answer" checks test HTTP status, which is 200 even when an action fails. | Fixed | The status line, the sheet closing after Undo and the reload are the proof; the comment says so. |
+| 5 | Low | Docs said the smoke test never reseeds; its sign-in reseeds a stale demo like any visitor's. | Fixed | README, CLAUDE.md, the plan and the test's header say so; a stale comment in login.e2e.ts too. |
+| 6 | Low | Reset demo could run after a successful Undo (if the reload check failed). | Fixed | A confirmed Undo means no reset. |
+| 7 | Low | `PRODUCTION_URL` exported but unused. | Fixed | Removed; the address is in the comments and docs. |
+| — | Found while drawing | A mask on the rotated `<ellipse>` turns with it, cutting a V out of the ring; a half-ellipse arc between exactly opposite points is ambiguous. | Fixed | The mask sits on a group; each half is two quarter arcs. |
+
+**Production checks** against https://orbit-dk.vercel.app: the smoke test
+passed before this change was deployed; the smoke and install checks run
+again after the push deploys it.
+
+Unreviewed (carried): a real 1x desktop tab, a real Android launcher's
+crop, iOS dark and tinted home-screen icons.

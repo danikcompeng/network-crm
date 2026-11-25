@@ -11,5 +11,9 @@ export const PHONE = {
   hasTouch: true,
 } satisfies BrowserContextOptions;
 
-/** The app under test: the local dev server unless BASE_URL says otherwise. */
+/**
+ * The app under test: the local dev server unless BASE_URL says otherwise.
+ * The live copy is https://orbit-dk.vercel.app (only the smoke and install
+ * checks run there); never the default, as the full suite resets the demo.
+ */
 export const BASE_URL = process.env.BASE_URL ?? "http://localhost:3200";

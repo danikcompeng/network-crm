@@ -37,8 +37,8 @@ test("'I already have a code' opens the code step for the typed email", async ({
 });
 
 test("Try the demo opens the sample network, Reset demo says so, and Log out ends it", async ({ page }) => {
-  // Fresh samples first: a visitor or another test may have changed the
-  // shared demo within the last hour, which a sign-in doesn't reseed.
+  // Fresh samples first, whatever state the shared demo is in (the counts
+  // below are the seed's).
   await reseedDemo();
   await signInDemo(page);
   await expect(page.getByText("Demo account")).toBeVisible();

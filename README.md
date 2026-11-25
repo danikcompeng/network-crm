@@ -4,6 +4,9 @@ A personal CRM for an internship search: the people you meet, who
 introduced you to whom, what you talked about, when to follow up, and
 every application, with a map of your network at the centre.
 
+**Live:** [orbit-dk.vercel.app](https://orbit-dk.vercel.app) · Tap **Try the demo** on the
+login screen to look around a sample network, no email needed.
+
 ![The network map: you in the middle, the people you met around you](docs/screenshots/feature-5/map-light.png)
 
 What's in it:
@@ -39,6 +42,12 @@ If port 3200 is taken, run the app on another port and point the tests at
 it: `npx next dev -p 3201`, then `BASE_URL=http://localhost:3201 npm run test:e2e`.
 Screenshots are taken from a production build (`npx next build`, then
 `npx next start -p 3300` and `BASE_URL=http://localhost:3300 npm run screens`).
+
+Against the live copy (`BASE_URL=https://orbit-dk.vercel.app npx playwright test`)
+only the smoke and install checks run: the demo account is shared and
+live, so they sign in once like a visitor, take back the one thing they
+save, and press Reset demo only if that fails. The full suite is for
+local runs.
 
 ## How it's built
 
@@ -78,4 +87,5 @@ No service-role key is used anywhere.
    order, once. Never edit one that's applied; add a new file.
 2. Authentication → URL Configuration → Redirect URLs: add
    `http://localhost:3200/auth/confirm` and the deployed
-   `https://<domain>/auth/confirm` (exact addresses, no wildcards).
+   `https://orbit-dk.vercel.app/auth/confirm` (exact addresses, no
+   wildcards). Leave the Site URL alone: Hold and Bitewise use it.

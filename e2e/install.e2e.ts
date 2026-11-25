@@ -2,7 +2,7 @@
 // icons WITHOUT the login cookie, so these run logged out.
 
 import { expect, test, type Page } from "@playwright/test";
-import { APP_ICONS, APP_NAME, iconByFile, iconUrl } from "../lib/app-identity";
+import { APP_ICONS, APP_NAME, iconByFile, iconUrl, markGeometry, pointOnOrbit, type Point } from "../lib/app-identity";
 
 /** Width and height of a PNG, from its header. */
 function pngSize(bytes: Buffer): { width: number; height: number } {
@@ -53,10 +53,10 @@ test("pages link the manifest, our icons and the iPhone tags, never a default fa
   await expect(page.locator('link[href*="favicon.ico"], link[href*="icon.svg"]')).toHaveCount(0);
 });
 
-/** The RGBA of one pixel of an icon, at (x, y) in the drawing's 0 0 100 100 box, read through a canvas. */
-function iconPixel(page: Page, file: string, x: number, y: number) {
+/** The RGBA of pixels of an icon, at (x, y) points in the drawing's 0 0 100 100 box, read through a canvas. */
+function iconPixels(page: Page, file: string, points: readonly (readonly [number, number])[]) {
   return page.evaluate(
-    async ({ src, x, y }) => {
+    async ({ src, points }) => {
       const img = new Image();
       img.src = src;
       await img.decode();
@@ -65,12 +65,19 @@ function iconPixel(page: Page, file: string, x: number, y: number) {
       canvas.height = img.height;
       const ctx = canvas.getContext("2d")!;
       ctx.drawImage(img, 0, 0);
-      const px = Math.min(img.width - 2, Math.max(1, Math.floor((img.width * x) / 100)));
-      const py = Math.min(img.height - 2, Math.max(1, Math.floor((img.height * y) / 100)));
-      return Array.from(ctx.getImageData(px, py, 1, 1).data);
+      return points.map(([x, y]) => {
+        const px = Math.min(img.width - 2, Math.max(1, Math.floor((img.width * x) / 100)));
+        const py = Math.min(img.height - 2, Math.max(1, Math.floor((img.height * y) / 100)));
+        return Array.from(ctx.getImageData(px, py, 1, 1).data);
+      });
     },
-    { src: iconUrl(iconByFile(file)!), x, y },
+    { src: iconUrl(iconByFile(file)!), points },
   );
+}
+
+/** The RGBA of one pixel of an icon. */
+async function iconPixel(page: Page, file: string, x: number, y: number) {
+  return (await iconPixels(page, file, [[x, y]]))[0];
 }
 
 const WHITE = [255, 255, 255, 255];
@@ -83,23 +90,61 @@ test("the corners: iPhone opaque, tab icon rounded (see-through), maskable full-
   expect(await iconPixel(page, "icon-maskable-512.png", 0, 0)).toEqual(COBALT);
 });
 
-test("the orbit mark is drawn: a white centre dot, ring and small dot, smaller on the maskable icon", async ({ page }) => {
+test("the orbit mark is drawn: the centre dot, the orbit behind and in front of it, the small dot; smaller on the maskable icon", async ({ page }) => {
   await page.goto("/login");
-  // Points along the line to the small dot (30 degrees below the left).
-  const along = (radius: number, k = 1): [number, number] => [50 - radius * k * Math.cos(Math.PI / 6), 50 + radius * k * Math.sin(Math.PI / 6)];
+  const checks = (shape: "full" | "maskable") => {
+    const mark = markGeometry(shape);
+    const c = mark.center;
+    const k = mark.core / 16; // 1, or the maskable scale
+    /** A point in the orbit's own frame (x along its long axis, y towards the near side). */
+    const local = (x: number, y: number): [number, number] => {
+      const t = (mark.orbit.tilt * Math.PI) / 180;
+      return [c[0] + x * Math.cos(t) - y * Math.sin(t), c[1] + x * Math.sin(t) + y * Math.cos(t)];
+    };
+    const end = pointOnOrbit(mark, 0);
+    const moon = mark.moon.center;
+    const outward = (p: Point, by: number): [number, number] => {
+      const d = Math.hypot(p[0] - c[0], p[1] - c[1]);
+      return [p[0] + ((p[0] - c[0]) / d) * by, p[1] + ((p[1] - c[1]) / d) * by];
+    };
+    // Where the far half's centre line is 17.25 (scaled) from the centre: inside the cut round the dot.
+    let behind: Point = end;
+    for (let i = 0; i <= 180; i++) {
+      const p = pointOnOrbit(mark, 270 - i / 2);
+      if (Math.hypot(p[0] - c[0], p[1] - c[1]) >= 17.25 * k) {
+        behind = p;
+        break;
+      }
+    }
+    return [
+      ["centre dot", [c[0], c[1]], WHITE],
+      ["centre dot, top", local(0, -8 * k), WHITE],
+      ["orbit, in front of the dot", pointOnOrbit(mark, 90), WHITE],
+      ["the cut above the orbit in front", local(0, 3.75 * k), COBALT],
+      ["the cut below the orbit in front", local(0, 12.25 * k), COBALT],
+      ["centre dot, below the orbit in front", local(0, 14.75 * k), WHITE],
+      ["orbit, far half", pointOnOrbit(mark, 330), WHITE],
+      ["the far half stops short of the dot", behind, COBALT],
+      ["orbit, raised right end", end, WHITE],
+      ["beyond the right end", outward(end, mark.stroke / 2 + 4 * k), COBALT],
+      ["small dot", moon, WHITE],
+      ["small dot, past the orbit", outward(moon, mark.moon.r - 1.5 * k), WHITE],
+      ["field beyond the small dot", outward(moon, mark.moon.r + 3 * k), COBALT],
+    ] as const;
+  };
+  // The whole near half, every 2 degrees, is drawn in front: a mask in the
+  // wrong coordinates once cut a V out of it, between the points above.
+  const nearHalf = (shape: "full" | "maskable") =>
+    Array.from({ length: 71 }, (_, i) => 20 + i * 2).map((t) => [`orbit in front, at ${t} degrees`, pointOnOrbit(markGeometry(shape), t), WHITE] as const);
+  const sweep = async (file: string, list: readonly (readonly [string, Point, number[]])[]) => {
+    const got = await iconPixels(page, file, list.map(([, p]) => p));
+    list.forEach(([what, , colour], i) => expect(got[i], `${file} ${what}`).toEqual(colour));
+  };
   for (const file of ["icon-192.png", "icon-512.png", "apple-touch-icon.png"]) {
-    expect(await iconPixel(page, file, 50, 50), `${file} centre dot`).toEqual(WHITE);
-    expect(await iconPixel(page, file, 50, 22), `${file} ring, at the top`).toEqual(WHITE);
-    expect(await iconPixel(page, file, 50, 78), `${file} ring, at the bottom (unbroken)`).toEqual(WHITE);
-    expect(await iconPixel(page, file, 50, 36), `${file} between the dot and the ring`).toEqual(COBALT);
-    expect(await iconPixel(page, file, ...along(28)), `${file} small dot`).toEqual(WHITE);
-    // The small dot shows outside the ring (whose outer edge is at 31.5).
-    expect(await iconPixel(page, file, ...along(35)), `${file} small dot, past the ring`).toEqual(WHITE);
-    expect(await iconPixel(page, file, ...along(40)), `${file} field beyond the small dot`).toEqual(COBALT);
+    await sweep(file, [...checks("full"), ...nearHalf("full")]);
   }
-  // Maskable: scaled by 0.95 about the centre. Where the full-size ring's
-  // top edge would be is field; the scaled ring and dot are white.
-  expect(await iconPixel(page, "icon-maskable-512.png", 50, 19.2), "maskable, unscaled ring").toEqual(COBALT);
-  expect(await iconPixel(page, "icon-maskable-512.png", 50, 50 - 28 * 0.95), "maskable, scaled ring").toEqual(WHITE);
-  expect(await iconPixel(page, "icon-maskable-512.png", ...along(28, 0.95)), "maskable, scaled small dot").toEqual(WHITE);
+  await sweep("icon-maskable-512.png", [...checks("maskable"), ...nearHalf("maskable")]);
+  // Maskable is scaled down: just inside where the full-size right end is, is field.
+  const fullEnd = pointOnOrbit(markGeometry("full"), 0);
+  expect(await iconPixel(page, "icon-maskable-512.png", fullEnd[0] + 1, fullEnd[1]), "maskable, unscaled orbit end").toEqual(COBALT);
 });

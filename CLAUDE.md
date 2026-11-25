@@ -32,6 +32,13 @@ patterns (adapted, not copied blindly).
 
 ## Running it
 
+- Live at https://orbit-dk.vercel.app (Vercel project `orbit-crm`;
+  orbit-crm-wine.vercel.app redirects there). Production checks:
+  `BASE_URL=https://orbit-dk.vercel.app npx playwright test` runs only
+  `e2e/smoke.e2e.ts` and `e2e/install.e2e.ts` (one demo sign-in, like a
+  visitor's; its one save undone, Reset demo only if that fails). Run
+  them after each deploy; local runs leave the smoke test out.
+
 - `npm run dev` serves on 3200. If 3200 is taken (another app's server),
   run `npx next dev -p 3201` and point Playwright at it with
   `BASE_URL=http://localhost:3201`; `signInDemo` checks the login heading

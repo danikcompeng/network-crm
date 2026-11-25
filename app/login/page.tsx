@@ -15,7 +15,7 @@ export default function LoginPage() {
     // gutter (px-5); larger screens get a centred column.
     <main className="mx-auto flex w-full max-w-[28rem] flex-1 flex-col px-5 pt-[max(4rem,calc(env(safe-area-inset-top)+3rem))] pb-[max(2rem,env(safe-area-inset-bottom))]">
       <header className="mb-10">
-        <OrbitMark size={32} cropped className="text-accent" />
+        <OrbitMark size={28} cropped className="text-accent" />
         <h1 tabIndex={-1} className="outline-none mt-5 text-display font-semibold tracking-tight text-ink">{APP_NAME}</h1>
         <p className="mt-3 text-lead text-ink-muted">{APP_DESCRIPTION}</p>
       </header>

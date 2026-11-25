@@ -9,7 +9,8 @@
 // - the signed-in tests share ONE demo sign-in (e2e/demo.setup.ts):
 //   Supabase rate-limits auth calls per address.
 //
-// Against a DEPLOYED copy (a BASE_URL that isn't localhost) only the smoke
+// Against a DEPLOYED copy (a BASE_URL that isn't localhost, e.g.
+// BASE_URL=https://orbit-dk.vercel.app) only the smoke and install
 // checks run, once, with no retries: the full suite would reset the live
 // demo under real visitors and overwrite the screenshots.
 
@@ -43,9 +44,11 @@ export default defineConfig({
           dependencies: ["setup"],
           use: { storageState: DEMO_SESSION },
         },
-        { name: "signed-out", testMatch: ["**/login.e2e.ts", "**/install.e2e.ts", "**/smoke.e2e.ts"] },
+        // Not smoke.e2e.ts: it's for the deployed copy (an extra demo sign-in
+        // and a save on the shared demo for nothing, locally).
+        { name: "signed-out", testMatch: ["**/login.e2e.ts", "**/install.e2e.ts"] },
       ]
-    : [{ name: "production", testMatch: ["**/smoke.e2e.ts"] }],
+    : [{ name: "production", testMatch: ["**/smoke.e2e.ts", "**/install.e2e.ts"] }],
   webServer: process.env.BASE_URL
     ? undefined
     : { command: "npm run dev", url: BASE_URL, reuseExistingServer: true, timeout: 120_000 },
