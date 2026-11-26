@@ -7,7 +7,11 @@ every application, with a map of your network at the centre.
 **Live:** [orbit-dk.vercel.app](https://orbit-dk.vercel.app) · Tap **Try the demo** on the
 login screen to look around a sample network, no email needed.
 
-![The network map in 3D: you the planet at the centre, the people you met on tilted rings around you](docs/screenshots/feature-7/map-light.png)
+![The network map in 3D: you the planet at the centre, the people you met on tilted rings around you. A finger turns it, then "Watch it grow" adds everyone in the order you met them](design/videos/orbit-map.gif)
+
+Full tour (Today, People, Applications, the map):
+[light](design/videos/orbit-demo-light.mp4) ·
+[dark](design/videos/orbit-demo-dark.mp4)
 
 What's in it:
 
@@ -40,6 +44,7 @@ npm run dev          # http://localhost:3200 (not 3000: Hold and Bitewise live t
 npm test             # unit tests and real-Postgres (PGlite) database tests
 npm run test:e2e     # Playwright on the shared demo account
 npm run screens      # screenshots for the design review (docs/screenshots/)
+npm run record:demo  # re-record the demo videos (design/videos/) on the live site
 ```
 
 If port 3200 is taken, run the app on another port and point the tests at
@@ -52,6 +57,12 @@ only the smoke and install checks run: the demo account is shared and
 live, so they sign in once like a visitor, take back the one thing they
 save, and press Reset demo only if that fails. The full suite is for
 local runs.
+
+`record:demo` films a fresh "Try the demo" visit in light and dark on the
+live site (a 393 × 852 screen at 2x, Chrome's screencast at 60 frames a
+second, encoded at 30 fps) and needs ffmpeg: on the PATH, in
+`FFMPEG_PATH`, or `npm install --no-save ffmpeg-static`. It changes one
+application's status on camera and puts it back afterwards.
 
 ## How it's built
 

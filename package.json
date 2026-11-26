@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "screens": "playwright test e2e/screens.e2e.ts"
+    "screens": "playwright test e2e/screens.e2e.ts",
+    "record:demo": "playwright test --config e2e/record.config.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

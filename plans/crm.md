@@ -1934,3 +1934,36 @@ Unreviewed (carried): live drift and label changes during it, the eases and scal
 deploy of 5174cc7: all 11 pass. Live screenshots of the 3D map at
 390 × 844 @3x, light and dark, no console errors:
 `docs/screenshots/feature-7/live-map-{light,dark}.png`.
+
+### Demo videos (2026-11-26)
+
+`npm run record:demo` (`e2e/record-demo.ts`, `e2e/record.config.ts`,
+`e2e/helpers/film.ts`, `e2e/helpers/finger.ts`, adapted from Bitewise)
+films the live site in a fresh browser through "Try the demo", light and
+dark, into `design/videos/`: `orbit-demo-{light,dark}.mp4` (the tour:
+Today, People and Grace Liu's page, Applications with one status change,
+the map turned, zoomed, a person's sheet, Recentre, "Watch it grow"),
+`orbit-loop-{light,dark}.mp4` (the map turning and growing, from the home
+view back to it, crossfaded so it loops) and `orbit-map.gif` (the light
+loop, 360 px, 20 fps, top of the README). Bitewise's format: 786 × 1704,
+H.264, no audio, here at 30 fps.
+
+- Bitewise's screenshot loop managed 20 frames a second here, too few for
+  the turning map. Chrome's screencast gives 60, but only at CSS size
+  under Playwright's device emulation; so the recorder launches Chrome
+  with a 393 × 852 window at a device scale of 2 (no emulated viewport),
+  on the GPU (ANGLE on Direct3D 11). Every frame keeps its own timestamp
+  and ffmpeg lays them on a 30 fps clock.
+- Checked: during the drift and the loop's drag every 1/30 s tick has a
+  fresh frame; the tour's drag runs at 30 for its first half second, and
+  the gaps over 40 ms are all still screens (the drift's pause after a
+  touch, between grow steps). Stills of mid-turn, the sheet and mid-grow
+  looked at in both themes; the loop's first and last frames differ in
+  under 200 of 1.3 million pixels.
+- The shared demo: Harborview's Firmware Intern goes Applied →
+  Interviewing on camera and back to Applied off camera (neither move
+  touches the applied date). A fresh demo sign-in afterwards showed
+  12 sent / 5 in process / 1 offer, 15 applications, Harborview Applied,
+  20 people.
+- Lengths: tour 53.7 s light, 51.5 s dark; loop 14.5 s light, 14.3 s
+  dark; GIF 14.5 s, 2.6 MB.
