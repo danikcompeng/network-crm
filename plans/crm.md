@@ -2244,3 +2244,8 @@ deploy of e3ee93b; the 11 production checks passed first):
 - The shared demo: Harborview back to Applied after each take; a fresh
   demo sign-in afterwards showed 12 sent / 5 in process / 1 offer, 15
   applications, Harborview Applied, 20 people.
+- With the CPU slowed 4× (`RECORD_CPU_SLOWDOWN=4`, into
+  `test-results/record-slow/`): the expand still runs at 60 apart from
+  one 83–100 ms gap near its end (the person's data arriving); the
+  pulse has no gaps; the loop's drag has no gaps over 40 ms. The demo was
+  put back after it too (checked: 12 / 5 / 1, Harborview Applied).
