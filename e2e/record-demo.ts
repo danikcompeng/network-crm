@@ -237,6 +237,33 @@ async function putBack(page: Page) {
   await expect(page.getByRole("status").filter({ hasText: "Saved: Harborview Medical Devices, Applied." })).toBeVisible();
 }
 
+/**
+ * One throwaway view transition before the camera rolls, drawn like the
+ * expand (a clipped, shadowed, blurred picture): a fresh browser profile
+ * otherwise drops frames on its first one, while the GPU sets that up
+ * (a phone that has opened the app before has this cached).
+ */
+async function warmUp(page: Page) {
+  await page.evaluate(async () => {
+    const el = document.createElement("div");
+    el.style.cssText = "position:fixed;left:20px;top:300px;width:300px;height:60px;background:var(--surface);view-transition-name:warm-up;opacity:0.01";
+    const style = document.createElement("style");
+    style.textContent = `
+      ::view-transition-group(warm-up) { animation-duration: 300ms; box-shadow: 0 0 0 1px var(--line-strong), 0 12px 32px rgb(29 33 37 / 0.12); border-radius: 16px; }
+      ::view-transition-image-pair(warm-up) { clip-path: inset(0 round 16px); }
+      ::view-transition-old(warm-up) { animation: 300ms both warm-blur; }
+      @keyframes warm-blur { to { opacity: 0; filter: blur(2px); } }`;
+    document.head.append(style);
+    document.body.append(el);
+    await document.startViewTransition(() => {
+      el.style.top = "40px";
+      el.style.height = "700px";
+    }).finished;
+    el.remove();
+    style.remove();
+  });
+}
+
 const megabytes = (file: string) => (fs.statSync(file).size / 1024 / 1024).toFixed(1);
 
 for (const theme of ["light", "dark"] as const satisfies readonly Theme[]) {
@@ -253,6 +280,7 @@ for (const theme of ["light", "dark"] as const satisfies readonly Theme[]) {
     await page.waitForLoadState("networkidle");
     await page.evaluate(() => document.fonts.ready);
 
+    await warmUp(page);
     const finger = await Finger.on(page);
     if (SLOWDOWN > 1) await (await page.context().newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate: SLOWDOWN });
     const film = await Film.roll(page, path.join(FRAMES, SLOWDOWN > 1 ? `${theme}-slow` : theme));

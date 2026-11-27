@@ -2223,3 +2223,24 @@ logic-checker #13.
 
 Checks: `tsc` and `eslint` clean; vitest 610/610; e2e 64/64 against a
 production build (7 new in `e2e/motion.e2e.ts`).
+
+**Videos re-recorded** (`npm run record:demo`, on the live site after the
+deploy of e3ee93b; the 11 production checks passed first):
+- Tour 51.6 s light, 50.0 s dark; loop 14.3 s each; GIF 14.4 s, 2.5 MB.
+  786 × 1704, H.264, 30 fps, no audio.
+- The expand runs at 60 frames a second in the dark take. In the light
+  take there's one 67 ms gap at its tail, where the ease-out barely
+  moves. The pulse runs at 60 with no gaps. The map's drags and drift
+  have no gaps over 40 ms; the long ones are all still moments (a held
+  tap, between grow steps).
+- A fresh browser profile dropped about 134 ms on its first expand
+  (either take, whichever ran first); warmed, it's smooth. The recorder
+  now plays one throwaway view transition drawn like the expand (clip,
+  shadow, blur) on the login page before the camera rolls, which a phone
+  that has opened the app before has cached anyway. That took the hole
+  down to the one gap above; the rest is most likely the person page's
+  first-time JavaScript. A first-ever expand on a cold phone may still
+  stutter once; not checked on a real iPhone.
+- The shared demo: Harborview back to Applied after each take; a fresh
+  demo sign-in afterwards showed 12 sent / 5 in process / 1 offer, 15
+  applications, Harborview Applied, 20 people.
