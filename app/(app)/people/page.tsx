@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { ExpandSourceScreen } from "@/components/person-page-transition";
 import { PeopleScreen } from "@/components/people-screen";
 import { loadPeople } from "@/lib/contacts-data";
 import { userToday } from "@/lib/server-helpers";
@@ -12,11 +13,14 @@ export const metadata: Metadata = { title: "People" };
 
 export default function PeoplePage() {
   return (
-    <main className="mx-auto flex w-full max-w-[32rem] flex-1 flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-8">
-      <Suspense fallback={<PeopleSkeleton />}>
-        <People />
-      </Suspense>
-    </main>
+    // A card here can grow into a person's page; the rest fades out under it (Motion polish).
+    <ExpandSourceScreen>
+      <main className="mx-auto flex w-full max-w-[32rem] flex-1 flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-8">
+        <Suspense fallback={<PeopleSkeleton />}>
+          <People />
+        </Suspense>
+      </main>
+    </ExpandSourceScreen>
   );
 }
 

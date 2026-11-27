@@ -39,7 +39,13 @@ import { Film, findFfmpeg, gifOf, lengthOf, stills } from "./helpers/film";
 import { Finger, showTouches, type Point } from "./helpers/finger";
 
 const BASE_URL = process.env.BASE_URL ?? "https://orbit-dk.vercel.app";
-const VIDEOS = path.resolve("design", "videos");
+/**
+ * RECORD_CPU_SLOWDOWN=4 records with the CPU slowed 4x (DevTools), as a
+ * check on a slower phone: the videos then go to test-results/, never
+ * over the real ones.
+ */
+const SLOWDOWN = Number(process.env.RECORD_CPU_SLOWDOWN ?? 1);
+const VIDEOS = SLOWDOWN > 1 ? path.resolve("test-results", "record-slow") : path.resolve("design", "videos");
 const FRAMES = path.resolve("test-results", "record");
 /** The page background (app/globals.css), for the tour's fade in and out. */
 const BACKGROUND = { light: "0xF8F7F4", dark: "0x131518" } as const;
@@ -135,6 +141,8 @@ async function act(page: Page, finger: Finger, film: Film) {
   const grace = page.getByRole("link", { name: /^Grace Liu/ });
   await bringIntoView(page, finger, grace, 0.55, 750);
   await pause(500);
+  // Her row grows into her page (Motion polish).
+  film.mark("expand");
   await finger.tap(grace);
   await expect(page.getByRole("heading", { level: 1, name: "Grace Liu" })).toBeVisible();
   film.mark("person");
@@ -246,7 +254,8 @@ for (const theme of ["light", "dark"] as const satisfies readonly Theme[]) {
     await page.evaluate(() => document.fonts.ready);
 
     const finger = await Finger.on(page);
-    const film = await Film.roll(page, path.join(FRAMES, theme));
+    if (SLOWDOWN > 1) await (await page.context().newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate: SLOWDOWN });
+    const film = await Film.roll(page, path.join(FRAMES, SLOWDOWN > 1 ? `${theme}-slow` : theme));
     let acted = false;
     try {
       await act(page, finger, film);
@@ -272,12 +281,17 @@ for (const theme of ["light", "dark"] as const satisfies readonly Theme[]) {
     // How steady the capture was on the map (the busiest stretch).
     const steady = film.report(film.at("turn"), film.at("loop-end"));
     console.log(`${theme}: map capture ${steady.perSecond.toFixed(1)} frames/s, ${steady.over40ms} gaps over 40 ms`);
+    // And through the expand (the tap's 120 ms hold, then 250 ms of growing) and the status pulse.
+    const expand = film.report(film.at("expand") + 120, film.at("expand") + 520);
+    console.log(`${theme}: expand ${expand.frames} frames (${expand.perSecond.toFixed(1)}/s), ${expand.over40ms} gaps over 40 ms`);
+    const pulse = film.report(film.at("status"), film.at("status") + 300);
+    console.log(`${theme}: pulse ${pulse.frames} frames (${pulse.perSecond.toFixed(1)}/s), ${pulse.over40ms} gaps over 40 ms`);
 
     // Stills of the busiest moments, to look at.
     const t0 = film.at("tour-start");
     const s = (mark: string, plus = 0) => (film.at(mark) + plus - t0) / 1000;
     const dir = path.join(FRAMES, "stills");
-    stills(ffmpeg, tourFile, dir, [s("how-met", 300), s("status", 300), s("turn", 750), s("sheet"), s("grow", 1500), s("grow", 3000)]);
+    stills(ffmpeg, tourFile, dir, [s("expand", 200), s("expand", 300), s("expand", 400), s("how-met", 300), s("status", 80), s("status", 300), s("turn", 750), s("sheet"), s("grow", 1500), s("grow", 3000)]);
     const l0 = film.at("loop-start") + 600; // the loop's 0:00 (encodeLoop drops the crossfade at the start)
     stills(ffmpeg, loopFile, dir, [(film.at("loop-turn") + 1300 - l0) / 1000, (film.at("loop-grow") + 2000 - l0) / 1000, 0, loop.seconds - 0.05]);
 

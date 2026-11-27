@@ -8,6 +8,7 @@
 // place, the next follow-up and Undo.
 
 import { useEffect, useId, useRef, useState, useTransition } from "react";
+import { CheckIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { ErrorText } from "@/components/ui/error-text";
 import { Sheet } from "@/components/ui/sheet";
@@ -220,13 +221,23 @@ export function LogSheet({ person, onClose, today }: Props) {
 
       {person && logged && offer && (
         <div className="flex flex-col gap-5">
-          <div>
-            <p ref={loggedRef} tabIndex={-1} className="text-lead font-semibold outline-none">
-              {loggedWords(logged.kind, person.name)}
-            </p>
-            {logged.cleared && (
-              <p className="mt-1 text-ink-muted">Their {formatDay(logged.cleared, logged.today)} follow-up is done.</p>
-            )}
+          <div className="flex items-start gap-3">
+            {/* Pulse to confirm (Motion polish): the check pops in; with Reduce Motion it's just there. */}
+            <span
+              aria-hidden="true"
+              data-logged-check=""
+              className="relative flex size-7 shrink-0 items-center justify-center rounded-full bg-accent-tint text-accent motion-safe:animate-[confirm-pop_var(--motion-sheet)_var(--ease-out)_both]"
+            >
+              <CheckIcon size={16} strokeWidth={2.25} />
+            </span>
+            <div className="min-w-0">
+              <p ref={loggedRef} tabIndex={-1} className="text-lead font-semibold outline-none">
+                {loggedWords(logged.kind, person.name)}
+              </p>
+              {logged.cleared && (
+                <p className="mt-1 text-ink-muted">Their {formatDay(logged.cleared, logged.today)} follow-up is done.</p>
+              )}
+            </div>
           </div>
 
           {followUpDone === null ? (

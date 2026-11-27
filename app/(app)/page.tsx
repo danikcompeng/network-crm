@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { ExpandSourceScreen } from "@/components/person-page-transition";
 import { TodayScreen } from "@/components/today-screen";
 import { isDemoEmail } from "@/lib/demo";
 import { userToday } from "@/lib/server-helpers";
@@ -13,12 +14,15 @@ export const metadata: Metadata = { title: "Today" };
 
 export default function TodayPage() {
   return (
-    <main className="mx-auto flex w-full max-w-[32rem] flex-1 flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-6">
-      {/* Everything here depends on who you are and what day it is for you. */}
-      <Suspense fallback={<TodaySkeleton />}>
-        <Today />
-      </Suspense>
-    </main>
+    // A card here can grow into a person's page; the rest fades out under it (Motion polish).
+    <ExpandSourceScreen>
+      <main className="mx-auto flex w-full max-w-[32rem] flex-1 flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-6">
+        {/* Everything here depends on who you are and what day it is for you. */}
+        <Suspense fallback={<TodaySkeleton />}>
+          <Today />
+        </Suspense>
+      </main>
+    </ExpandSourceScreen>
   );
 }
 

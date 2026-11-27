@@ -63,6 +63,9 @@ live site (a 393 × 852 screen at 2x, Chrome's screencast at 60 frames a
 second, encoded at 30 fps) and needs ffmpeg: on the PATH, in
 `FFMPEG_PATH`, or `npm install --no-save ffmpeg-static`. It changes one
 application's status on camera and puts it back afterwards.
+`RECORD_CPU_SLOWDOWN=4 npm run record:demo` records with the CPU slowed 4×
+(a slower phone) into `test-results/record-slow/` instead, to check the
+frame times there.
 
 ## How it's built
 

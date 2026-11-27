@@ -151,6 +151,149 @@
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/*
+  A person's row growing into their page, and back (plans/crm.md, Motion
+  polish; components/expand.ts). Only the pair moves. The rest of the
+  screen and the tab bar keep only their new picture, so they swap at once
+  as before (and nothing is added up with plus-lighter), except that the
+  screen you tapped on fades out under the growing card; the tab bar stays
+  on top. Taps go through to the live page (only the moving pair and the
+  tab bar skip them, for 250 ms).
+*/
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-old(root),
+::view-transition-old(tab-bar) {
+  display: none;
+}
+::view-transition-new(root),
+::view-transition-new(tab-bar),
+::view-transition-group(tab-bar) {
+  animation: none;
+}
+::view-transition-group(tab-bar) {
+  z-index: 1;
+}
+/* A person page with nothing to pair with (opened from the map, left for
+   another tab) just appears or goes, as it always did. */
+::view-transition-old(person-page):only-child {
+  display: none;
+}
+::view-transition-new(person-page):only-child {
+  animation: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* The box grows from the row's to the page's; both pictures keep their
+     real size, pinned to the top, so the page is revealed by the growing
+     card instead of stretched. */
+  ::view-transition-group(person-page) {
+    animation-duration: var(--motion-sheet);
+    animation-timing-function: var(--ease-out);
+    /* The growing card's edge: a hairline and a soft lift. */
+    border-radius: var(--radius-card);
+    box-shadow:
+      0 0 0 1px var(--line-strong),
+      0 12px 32px rgb(29 33 37 / 0.12);
+  }
+  ::view-transition-image-pair(person-page) {
+    clip-path: inset(0 round var(--radius-card));
+  }
+  ::view-transition-old(person-page),
+  ::view-transition-new(person-page) {
+    block-size: 100%;
+    object-fit: none;
+    object-position: left top;
+    mix-blend-mode: normal;
+  }
+  /* The page is opaque from the first frame (nothing behind shows through
+     the card); the row's picture lies on top of it and fades off. */
+  ::view-transition-old(person-page) {
+    z-index: 1;
+    animation: expand-out var(--motion-fast) var(--ease-out) both;
+  }
+  ::view-transition-new(person-page) {
+    animation: none;
+  }
+  /* While something grows, the screen it left fades out under it instead
+     of vanishing (ExpandSourceScreen: only for that navigation). */
+  ::view-transition-old(.screen-fade) {
+    animation: expand-out-root var(--motion-fast) var(--ease-out) both;
+  }
+}
+@keyframes expand-out-root {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes expand-out {
+  to {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+/* Reduce Motion: every view transition is instant. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-image-pair(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+  ::view-transition-old(*) {
+    display: none;
+  }
+}
+
+/* Pulse to confirm (Motion polish): a 2 px cobalt ring that moves out
+   4 px from the edge and fades (a status saved), and a log's check popping
+   in. Used behind motion-safe: only; with Reduce Motion there's no ring. */
+@keyframes confirm-ring {
+  from {
+    opacity: 1;
+    box-shadow:
+      0 0 0 0 var(--surface),
+      0 0 0 2px var(--accent);
+  }
+  40% {
+    opacity: 0.8;
+  }
+  to {
+    opacity: 0;
+    box-shadow:
+      0 0 0 4px var(--surface),
+      0 0 0 6px var(--accent);
+  }
+}
+@keyframes confirm-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* A stage glyph swapping (Motion polish): the old one fades out into a
+   2 px blur as the new one fades in out of one, in the same spot. */
+@keyframes glyph-in {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+@keyframes glyph-out {
+  to {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
 @layer base {
   html {
     background: var(--background);

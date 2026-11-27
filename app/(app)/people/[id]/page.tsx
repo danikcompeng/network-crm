@@ -6,6 +6,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ContactScreen } from "@/components/contact-screen";
 import { ChevronLeftIcon } from "@/components/icons";
+import { PersonPageTransition } from "@/components/person-page-transition";
 import { isId } from "@/lib/contact-input";
 import { loadContact } from "@/lib/contacts-data";
 import { userToday } from "@/lib/server-helpers";
@@ -15,21 +16,25 @@ export const metadata: Metadata = { title: "Person" };
 
 export default function ContactPage({ params }: PageProps<"/people/[id]">) {
   return (
-    <main className="mx-auto flex w-full max-w-[32rem] flex-1 flex-col px-5 pt-[max(0.75rem,env(safe-area-inset-top))] pb-8">
-      <Link
-        href="/people"
-        className="-ml-3 inline-flex min-h-11 items-center gap-1 self-start rounded-(--radius-field) pr-3 pl-1.5 text-sm font-semibold text-accent active:bg-surface-press"
-      >
-        <ChevronLeftIcon size={20} />
-        People
-      </Link>
-      {/* The id is request data (Cache Components): read it inside Suspense. */}
-      <Suspense fallback={<ContactSkeleton />}>
-        {params.then(({ id }) => (
-          <Contact id={id} />
-        ))}
-      </Suspense>
-    </main>
+    // The whole page is what the row that opened it grows into (Motion polish):
+    // opaque, so nothing behind shows through while it grows.
+    <PersonPageTransition>
+      <main className="mx-auto flex w-full max-w-[32rem] flex-1 flex-col bg-background px-5 pt-[max(0.75rem,env(safe-area-inset-top))] pb-8">
+        <Link
+          href="/people"
+          className="-ml-3 inline-flex min-h-11 items-center gap-1 self-start rounded-(--radius-field) pr-3 pl-1.5 text-sm font-semibold text-accent active:bg-surface-press"
+        >
+          <ChevronLeftIcon size={20} />
+          People
+        </Link>
+        {/* The id is request data (Cache Components): read it inside Suspense. */}
+        <Suspense fallback={<ContactSkeleton />}>
+          {params.then(({ id }) => (
+            <Contact id={id} />
+          ))}
+        </Suspense>
+      </main>
+    </PersonPageTransition>
   );
 }
 

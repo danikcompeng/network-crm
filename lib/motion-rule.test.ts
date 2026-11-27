@@ -63,6 +63,8 @@ export function unguardedCssMotion(css: string): string[] {
       if (!m) continue;
       if (blocks.some((p) => p.startsWith("@keyframes") || p.includes("prefers-reduced-motion: no-preference"))) continue;
       const value = m[2];
+      // Switching animation off moves nothing (Reduce Motion, a layer held still).
+      if (/^none(\s*!important)?$/.test(value.trim())) continue;
       // A transition of colours or opacity only is fine; an animation could move anything.
       if (m[1] === "transition" && !/\b(all|transform|translate|scale|rotate)\b/.test(value) && !MOVING.test(value)) continue;
       found.push(declaration);
@@ -109,6 +111,8 @@ describe("the motion rule", () => {
     expect(unguardedCssMotion(`@media (prefers-reduced-motion: no-preference) { .a { animation: spin 1s; } }`)).toEqual([]);
     expect(unguardedCssMotion(`.a { transition: color 150ms, background-color 150ms; }`)).toEqual([]);
     expect(unguardedCssMotion(`@keyframes x { from { transform: none; } }`)).toEqual([]);
+    expect(unguardedCssMotion(`::view-transition-new(root) { animation: none; } .b { animation: none !important }`)).toEqual([]);
+    expect(unguardedCssMotion(`.a { animation: none 1s; }`)).toEqual(["animation: none 1s"]);
   });
 
   it("every component class that moves things is behind motion-safe: (or guarded in JavaScript, by name)", () => {

@@ -7,6 +7,8 @@
 
 import { useEffect, useId, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { EXPAND_TYPE, expandFromPerson } from "@/components/expand";
 import { StageLabel } from "@/components/stage-chip";
 import { Button, buttonClass } from "@/components/ui/button";
 import { ErrorText } from "@/components/ui/error-text";
@@ -27,6 +29,7 @@ type Props = {
 
 export function PersonSheet({ personId, onClose, onLog, today }: Props) {
   const uid = useId();
+  const router = useRouter();
   const [person, setPerson] = useState<PersonSheetData | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [changing, setChanging] = useState(false);
@@ -101,7 +104,21 @@ export function PersonSheet({ personId, onClose, onLog, today }: Props) {
       footer={
         person ? (
           <div className="flex gap-3">
-            <Link href={`/people/${person.id}`} onClick={onClose} className={buttonClass("secondary")}>
+            <Link
+              href={`/people/${person.id}`}
+              onClick={(e) => {
+                // Their card on the screen behind (Today) grows into the page
+                // (Motion polish): the same navigation, tagged so the screen
+                // behind fades out. A plain one when there's no card (the map).
+                const plain = e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0;
+                if (!plain && expandFromPerson(person.id)) {
+                  e.preventDefault();
+                  onClose();
+                  router.push(`/people/${person.id}`, { transitionTypes: [EXPAND_TYPE] });
+                } else onClose();
+              }}
+              className={buttonClass("secondary")}
+            >
               Their page
             </Link>
             <Button onClick={() => onLog({ id: person.id, name: person.name })}>Log interaction</Button>

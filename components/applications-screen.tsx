@@ -12,6 +12,7 @@ import type { PersonOption } from "@/components/contact-dialog";
 import { ChevronDownIcon, CloseIcon, ExternalIcon, PlusIcon, SearchIcon } from "@/components/icons";
 import { ImportSheet } from "@/components/import-sheet";
 import { Button } from "@/components/ui/button";
+import { PulseRing } from "@/components/ui/pulse-ring";
 import { Toast, type ToastMessage } from "@/components/ui/toast";
 import { changeStatus } from "@/lib/application-actions";
 import { QuickStatusQueue } from "@/lib/quick-status";
@@ -235,6 +236,8 @@ export function ApplicationsScreen({ applications, people, today }: Props) {
                       quick.change(a, to);
                     }}
                     moved={frozen !== null && !matchingIds.has(a.id)}
+                    pulse={quick.pulses.get(a.id) ?? 0}
+                    onPulseDone={() => quick.played(a.id)}
                   />
                 </li>
               ))}
@@ -280,6 +283,8 @@ export function ApplicationRowView({
   onOpen,
   onStatus,
   moved,
+  pulse = 0,
+  onPulseDone,
 }: {
   application: ApplicationRow;
   person: string | null;
@@ -288,6 +293,10 @@ export function ApplicationRowView({
   onStatus?: (to: ApplicationStatus) => void;
   /** Shown when a quick change moved it out of the current filter (it stays put until you leave). */
   moved?: boolean;
+  /** Goes up each time a status change is saved: the select pulses (Motion polish). */
+  pulse?: number;
+  /** The pulse has played: forget it, so the row shown again (a filter, a search) doesn't replay it. */
+  onPulseDone?: () => void;
 }) {
   const hydrated = useHydrated();
   const date = rowDate(a, today);
@@ -333,6 +342,7 @@ export function ApplicationRowView({
               ))}
             </select>
             <ChevronDownIcon size={16} className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-ink-muted" />
+            {pulse > 0 && <PulseRing key={pulse} onDone={onPulseDone} />}
           </div>
         ) : (
           <span className={`rounded-md bg-surface-press px-2.5 py-1 text-sm font-medium ${TONE_CLASS[statusTone(a.status)]}`}>
@@ -368,6 +378,14 @@ export function ApplicationRowView({
 function useQuickStatus(applications: readonly ApplicationRow[], say: (words: string, tone?: "info" | "error") => void) {
   type Override = { status: ApplicationStatus; applied_on: string | null; updated_at: string };
   const [overrides, setOverrides] = useState<Map<string, Override>>(new Map());
+  // Saves per row, for the pulse (Motion polish). Kept apart from the
+  // overrides, which fresh server data resets, so a refresh never replays
+  // or cuts one; cleared when the page is hidden, so none greets the next visit.
+  const [pulses, setPulses] = useState<Map<string, number>>(new Map());
+  useLayoutEffect(() => () => setPulses(new Map()), []);
+  // Each row's latest choice: a save of an older one (changed again while
+  // it was saving) doesn't pulse.
+  const chosen = useRef(new Map<string, ApplicationStatus>());
   const sayRef = useRef(say);
   useEffect(() => {
     sayRef.current = say;
@@ -384,6 +402,7 @@ function useQuickStatus(applications: readonly ApplicationRow[], say: (words: st
         send: (id, stamp, to) => changeStatus(id, stamp, to),
         onSaved: (id, saved) => {
           setOverrides((m) => new Map(m).set(id, saved));
+          if (chosen.current.get(id) === saved.status) setPulses((m) => new Map(m).set(id, (m.get(id) ?? 0) + 1));
           sayRef.current(`Saved: ${names.current.get(id) ?? "the application"}, ${APPLICATION_STATUS_LABELS[saved.status]}.`);
         },
         onRolledBack: (id, message) => {
@@ -413,11 +432,22 @@ function useQuickStatus(applications: readonly ApplicationRow[], say: (words: st
   };
 
   function change(a: ApplicationRow, to: ApplicationStatus) {
+    chosen.current.set(a.id, to);
     setOverrides((m) => new Map(m).set(a.id, { status: to, applied_on: a.applied_on, updated_at: m.get(a.id)?.updated_at ?? a.updated_at }));
     queue.current?.change(a.id, a.updated_at, to);
   }
 
-  return { shown, change };
+  /** A row's pulse has played. */
+  function played(id: string) {
+    setPulses((m) => {
+      if (!m.has(id)) return m;
+      const next = new Map(m);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  return { shown, change, pulses, played };
 }
 
 /** False in the server's HTML and until React has taken over the page; true after. */

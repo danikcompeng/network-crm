@@ -48,6 +48,9 @@ function Bar({ current }: { current: string | null }) {
   return (
     <nav
       aria-label="Main"
+      // Its own view-transition layer, held still and on top, so a page
+      // growing out of a row never passes over it (Motion polish).
+      style={{ viewTransitionName: "tab-bar" }}
       className="fixed inset-x-0 bottom-0 z-20 border-t border-line-strong bg-surface pb-[env(safe-area-inset-bottom)]"
     >
       <ul className="mx-auto flex max-w-[32rem]">

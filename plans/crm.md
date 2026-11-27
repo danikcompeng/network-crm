@@ -1410,6 +1410,206 @@ was declined: the brief names three.js and real depth):
   re-probed each visit); 8 labels at most (the brief's "only near the
   camera or on focus"); pitch 42 degrees; light mode glows faintly.
 
+### Motion polish (2026-11-27)
+
+**Goal:** four small motions from a "10 UI/UX tips" list: the same
+element expanding, a pulse to confirm, icons crossfading with a blur, and
+the map staging the focus. The rules: the existing tokens
+(`--motion-fast` 150, `--motion-base` 200, `--motion-sheet` 250 ms,
+`--ease-out`), every animation 150–400 ms and there for a reason, Reduce
+Motion gets a fade or nothing, nothing ever blocks input, 60 fps on an
+iPhone, no new libraries.
+
+**1. Expand: a person's row grows into their page** (and Back shrinks it
+into place: _not built, see "Found while building"_).
+- React 19.3's `<ViewTransition>` (the browser's View Transitions API;
+  in React and Next 16 already, no flag, no library). The person page
+  (`app/(app)/people/[id]/page.tsx`) wraps its `<main>` in a
+  `<ViewTransition name="person-page">` with `enter`, `exit` and `share`
+  all `person-expand`, `update="none"` and `default="none"`. It sits in
+  the page's static shell, outside the Suspense that loads the person, so
+  it's in the navigation's first commit (a prefetched shell); the details
+  stream in inside it.
+- **The other end** is whichever element stands for that person on the
+  screen you leave or return to: a People row (the row's link) or a Today
+  follow-up card. Each carries `data-expand="<id>"`. One helper,
+  `nameExpandSource(id)`, gives every element with that id the same
+  view-transition name (`person-page`, class `person-expand`) and takes
+  it off every other one. It runs:
+  - on a tap on a People row, before the navigation starts (the old
+    picture is taken before React changes the page);
+  - on "Their page" in the person sheet (Today; from the map nothing
+    matching is on screen, so the page just appears, as now);
+  - when a person page appears (a layout effect, which re-runs when
+    `<Activity>` shows a kept page again), so Back, the People tab or the
+    browser's Back button shrinks it into **that** person's row, even
+    after going from one person to another through a chain link.
+  Rows on a hidden page are `display: none`, which a view transition
+  never captures, so two visible elements never share the name.
+- **Only a pair moves.** The pair is the row and the page: its box grows
+  from the row's to the page's (the browser's morph) over
+  `--motion-sheet` (250 ms) with `--ease-out`, and the row's picture
+  crossfades into the page's with a 2 px blur at its middle (hides the
+  stretch). A page with nothing to pair with (opened from the map or a
+  chain link, a reload, leaving to another tab) isn't animated
+  (`:only-child`: none). The rest of the screen swaps at once, as now
+  (`root`: none). Person to person (a chain link): the two pages pair
+  and crossfade in place.
+- The tab bar gets its own name with no animation, above the rest, so
+  the growing page never passes over it.
+- **Never blocks input:** `::view-transition { pointer-events: none }`
+  (taps go to the live page underneath).
+- **Reduce Motion:** no view-transition animation at all (instant, as
+  now). Browsers without view transitions: instant, as now.
+
+**2. Pulse to confirm.**
+- **Status change** (Applications; a person's page shows statuses but
+  doesn't change them): when a quick
+  status change is saved (the same moment as the "Saved: …" toast), a
+  cobalt ring round the status select grows a few px and fades over
+  `--motion-sheet` (250 ms; a box-shadow ring, see "Found while
+  building"). Each save replays it (keyed by a per-row count). A rolled-back change
+  doesn't pulse (it says so in the toast).
+- **Logged an interaction:** the "Logged a call with …" line in the log
+  sheet starts with a small cobalt check in a tinted circle that pops in
+  (scale 0.6 → 1.08 → 1, 250 ms) with a ring that fades out.
+- **Reduce Motion:** no ring (not drawn); the check simply appears. The
+  words (toast, status line) confirm it either way.
+
+**3. Blur crossfade for stage glyphs.**
+- `StageMark` (every stage glyph in the app's DOM: the person page's
+  chip, People rows, the person sheet, the map list and the 3D map's
+  labels), when its stage changes, keeps the old glyph for
+  `--motion-base` (200 ms): stacked in the same spot, the old one fades
+  out into a 2 px blur while the new one fades in out of one. Only on a
+  change, never on the first render. Nothing moves or resizes (the glyph
+  box is fixed).
+- **Not done:** application statuses have no icons (a word in a native
+  select, whose text can't be animated), and the 3D map's spheres draw
+  their glyphs in WebGL (a swap there is one frame, as now).
+- **Reduce Motion:** the new glyph appears at once.
+
+**4. Stage the focus over the 3D map: skipped, it's already there.**
+Feature 7 stops the drift while a person's sheet is open (`canDrift`
+needs no one selected) and the sheet's scrim (graphite at 40%, black at
+60% at night) dims the map as it fades in over 250 ms; the tapped
+person keeps their label with a cobalt edge. A second dimming under the
+scrim would only darken it twice.
+
+**Tests:**
+- Unit: the motion rule allows `animation: none` outside a
+  no-preference block (it moves nothing), with a self-check; the new CSS
+  passes it.
+- e2e (`e2e/motion.e2e.ts`, signed in): a script wraps
+  `document.startViewTransition` and records, once each transition is
+  ready, which view-transition pseudo-elements animate.
+  - With motion: People → Grace pairs `person-page` (an old and a new
+    picture); the People tab back pairs again, and the row named is
+    Grace's; the browser's Back does too; from the map the page appears
+    with nothing animated.
+  - With Reduce Motion: nothing animates.
+  - A status change pulses once it's saved (the ring is there and
+    animating), then goes back; not with Reduce Motion.
+  - Logging shows the check and its pulse; Undo puts it back.
+  - Editing a person's stage shows two glyphs for a moment, then one;
+    with Reduce Motion only ever one; the stage goes back.
+- 60 fps: the demo recording's frame times through the expand and the
+  pulse.
+- Screenshots for design-critic (390 × 844 @3x, light and dark,
+  `docs/screenshots/motion/`): the expand half way (animations slowed
+  through the DevTools protocol), the pulse, the logged check, a glyph
+  mid-crossfade.
+
+After it ships: re-record every demo video (`npm run record:demo`), check
+the frames for stutter, put the demo back.
+
+**Decided after the logic check** (these replace the bullets above where
+they disagree):
+- **A name lives for one transition only** _(logic-checker #1)_. A tap on
+  a row (or "Their page") names that one element; on the way back, the
+  screen you land on names the row of the person page you just left,
+  read from a one-shot hand-off the person page leaves as it hides
+  (cleared a moment later, so a screen shown later never picks it up).
+  Every hand-set name comes off as soon as the person page's
+  `<ViewTransition>` reports its animation (`onEnter`, `onExit`,
+  `onShare`), or after 2 s at the latest. So adding Sam right after
+  visiting Grace never grows Grace's row into Sam's page. People skips
+  the shrink when it arrives with `?deleted=` (the row is about to go).
+  Coming back to Today from a person page shrinks into their Today card,
+  if they have one on screen: the same element, in its place.
+- **Only into a row you can see** _(#2)_: the row is named on the way
+  back only if it's inside the viewport after the screen is shown;
+  otherwise the page just goes, as now. The same if the screen you return
+  to was dropped from memory and loads fresh (Next keeps 3 routes) _(#6)_.
+- **The picture doesn't stretch or spill** _(#3)_: the group clips to its
+  box (`overflow: clip`, the card's 16 px corners), and both pictures
+  keep their real size, pinned to the top (`object-fit: none`), so the
+  page is revealed by the box growing round it rather than scaled. The
+  blur is on the row's picture only (#12: no blur over a full page).
+  People rows get the card's surface colour, so the row's picture is a
+  card.
+- **No wash-out** _(#4)_: the root and the tab bar keep only their new
+  picture (`display: none` on the old one, `animation: none` on the new
+  one, as Next's header recipe), so nothing is added up with
+  `plus-lighter`; the tab bar's group sits on top. Reduce Motion turns
+  off every view-transition animation with `(*)` selectors (a hand-set
+  class isn't supported everywhere); the e2e is what proves it.
+- **Input** _(#7)_: taps go through to the live page; for the 250 ms of
+  an expand or shrink only the moving pair and the tab bar don't take
+  them (the browser skips named elements while they move).
+- A browser swipe back that already animated (`hasUAVisualTransition`
+  on `popstate`) isn't animated a second time _(#8)_.
+- **Pulses** _(#5, #9)_: counts live in their own state, outside the
+  fresh-data reset; the ring and the check are removed when their
+  animation ends or is cancelled, and pulses are cleared when the page is
+  hidden, so going back to a kept screen never replays them. A save
+  pulses only if what it saved is still that row's latest choice. (#9
+  also points at an older edge case: a change made during a save, if a
+  refresh lands in between, may be sent with a stale stamp and refused;
+  logged as found, not part of this change.)
+- **Glyphs** _(#5, #10)_: the fade classes are on only while a swap
+  runs; the old glyph goes when its fade ends (or is cancelled), and at
+  once when the page is hidden. The old glyph takes its row's colour
+  change at once (the colour is the parent's); accepted. Its e2e waits
+  for the edit sheet to close before looking.
+- **Item 4's gap** _(#13)_: Log interaction from a map sheet cleared the
+  selection, so the drift came back behind the log sheet; the map now
+  stays selected while either sheet is open.
+- Person to person, the pages pair and crossfade in place; if the first
+  was scrolled, its picture moves up as it fades _(#11)_: accepted.
+- 60 fps _(#12)_: the recording also runs once with the CPU slowed 4×
+  (DevTools), and the frame times through the expand are checked.
+- Two kept person pages each hold a `<ViewTransition name="person-page">`
+  (one hidden); the dev console is checked for a warning _(#14)_.
+
+**Found while building** (these replace the bullets above where they
+disagree):
+- **Back doesn't shrink; it stays an instant swap.** People and Today
+  load their lists fresh on every visit: coming back, the kept screen
+  shows its skeleton for about 300 ms, so when the browser takes the new
+  picture there's no row to shrink into (checked: the row is
+  `display: none` at that moment, and the screen's layout effects only
+  run once the list is back). The browser's own Back runs no transition
+  at all in Next. Making the row be there would mean caching the lists
+  in the browser (`staleTimes`), trading fresh data for an animation; not
+  done. So the hand-off, the arrival naming and the swipe check are gone,
+  and the person page's `<ViewTransition>` animates only `enter`
+  (`exit`, `share` and `update` are `none`, so leaving a person page, or
+  going from one person to another, starts no transition).
+- **The screen behind fades out under the growing card.** React leaves
+  the root out of the pictures, so the list can't fade from there: People
+  and Today wrap their `<main>` in `ExpandSourceScreen`, a
+  `<ViewTransition>` that exits with `screen-fade` (150 ms) only when the
+  navigation carries the `person-expand` type (the row's Link
+  `transitionTypes`; the sheet's "Their page" pushes with it only when a
+  card on screen will grow). Every other way of leaving stays instant.
+- **The clip** is a `clip-path` on the pair (`overflow` on the group
+  doesn't clip in Chrome), with the card's 16 px corners.
+- **The status pulse** is a box-shadow ring (spreads 6 px and fades),
+  not a transform: a select can't take a pseudo-element, and a ring
+  scaled with the select would stretch unevenly. One small element for
+  250 ms.
+
 
 ## Reviews
 
@@ -1967,3 +2167,59 @@ H.264, no audio, here at 30 fps.
   20 people.
 - Lengths: tour 53.7 s light, 51.5 s dark; loop 14.5 s light, 14.3 s
   dark; GIF 14.5 s, 2.6 MB.
+
+### Motion polish (2026-11-27)
+
+The brief: four motions from a "10 UI/UX tips" list (expand, pulse to
+confirm, icons crossfading with a blur, staging the focus on the map),
+then every demo video re-recorded.
+
+**logic-checker** (plan): ready after fixes.
+
+| # | Severity | Finding | Outcome | What was done |
+|---|---|---|---|---|
+| 1 | High | Names left on rows pair the wrong person (Add person after a visit, delete, the Today tab). | Fixed | A name lives for one transition: set at the tap, off at the page's `onEnter` or after 2 s; the page only takes part in a navigation typed `person-expand` (after code review), so a stray name has nothing to pair with. |
+| 2 | High | Back often shrinks into a row that is off screen. | Changed plan | No shrink at all (see 6 and "Found while building"). |
+| 3 | Medium | The page's picture spills out of the growing box. | Fixed | A `clip-path` with the card's corners on the pair (`overflow` on the group doesn't clip); both pictures at real size, pinned to the top. |
+| 4 | Medium | `animation: none` on both root pictures washes the screen out (plus-lighter). | Fixed | Old root and tab-bar pictures `display: none`, new ones not animated; Reduce Motion with `(*)` selectors. |
+| 5 | Medium | The pulse, check and glyph replay on a kept page; a refresh can cut a pulse. | Fixed | Pulses in their own state, cleared on hide and once played; the glyph swap cleared on hide. |
+| 6 | Medium | The shrink fails when the screen was dropped or loads fresh. | Changed plan | Building found it's worse: People and Today always reload with a skeleton (about 300 ms), so there's never a row to shrink into. Back stays an instant swap (matches Feature 6: entrances move, exits don't). |
+| 7 | Medium/Low | "Never blocks input" overstated. | Fixed (wording) | Only the moving pair and the tab bar skip taps, for 250 ms. |
+| 8 | Low | A swipe back plays twice. | Moot | No transition on Back. |
+| 9 | Low | Pulse on an intermediate save; an older stale-stamp edge case. | Fixed / logged | Pulses only when the saved status is the row's latest choice. The stale-stamp case (a change during a save, a refresh in between) is older than this change: logged, not fixed here. |
+| 10 | Low | The glyph swap is rarely seen; the test is racy. | Accepted / fixed | Kept as polish; the e2e waits for the edit sheet to close and watches with a MutationObserver. |
+| 11 | Low | Person to person moves a scrolled page. | Moot | Person to person starts no transition. |
+| 12 | Low | 60 fps on a desktop isn't evidence for an iPhone. | Partly | The blur is on the row's small picture only; the recording reports frame times through the expand and the pulse, and once more with the CPU slowed 4×. Not checked on a real iPhone. |
+| 13 | Low | Logging from a map sheet let the drift resume. | Fixed | The map stays focused while either sheet is open. |
+| 14 | Low | Two kept pages with the same name may warn. | Checked | React stops tracking a name when `<Activity>` hides a page (code-reviewer confirmed in react-dom). |
+
+**code-reviewer**: ship after fixes.
+
+| # | Severity | Finding | Outcome | What was done |
+|---|---|---|---|---|
+| 1 | Medium | The growing page is see-through: list text shows through it. | Fixed | `bg-background` on the person page; its picture is opaque from the first frame and the row's picture fades off on top. |
+| 2 | Medium | A status pulse replays when its row comes back into the list (a filter, a search). | Fixed | `PulseRing` says when it has played and the row's entry is forgotten; e2e: the Offer filter, then All, no second pulse. |
+| 3 | Low | A cmd/ctrl-click on a row leaves it named for 2 s. | Fixed | Modified clicks don't name; e2e. |
+| 4 | Low | Every visit to a person page starts a view transition. | Fixed (mostly) | `enter` only for the `person-expand` type. React may still start a do-nothing transition for other navigations (only its own root no-ops run; the e2e checks nothing else animates). |
+| 5 | Low | The old glyph and the ring never finish with Reduce Motion. | Fixed | Neither is created with Reduce Motion. |
+| 6 | Low | "Browser Back runs no transition" says more than the docs. | Fixed (wording) | "carries no transition type, so nothing is set to animate". |
+| – | Tests | Pulse replay, cmd-click, other navigations animating nothing, Reduce Motion. | Added | In `e2e/motion.e2e.ts`. Not added: a refused save drawing no ring (needs a forced conflict), StageMark A→B→C, jsdom unit tests for `expand.ts`. |
+
+**design-critic** (screenshots in `docs/screenshots/motion/`): ship after fixes.
+
+| # | Severity | Finding | Outcome | What was done |
+|---|---|---|---|---|
+| 1 | High | Text piles up inside the growing box (no background). | Fixed | As code-reviewer #1, plus a hairline (`line-strong`) and a soft lift on the moving card. |
+| 2 | Medium | The row grows into a skeleton; Grace's name disappears mid-expand. | Declined | Drawing a provisional header from the row while the page loads means two headers to keep in step and a swap when the real one lands; on a prefetched shell the person usually arrives within the 250 ms. |
+| 3 | Medium | The status ring is too faint and reads as a focus glow. | Fixed | A real 2 px ring that moves out 4 px, holds its opacity to 40%, then fades. Still a box-shadow (one small element repainted for 250 ms), not a composited transform: the plan's wording was wrong and is corrected below. |
+| 4 | Medium | The log check's ring is lost inside the pop. | Fixed | Ring removed; the pop alone confirms. |
+| 5 | Low | The expand's first frames jump on long travel. | Not changed | Kept on `--ease-out` (the app's one curve); watched in the recording. |
+| 6 | Low | The glyph shot shows no swap. | Tried | Re-shot with the animations paused 80 ms in; at 12 px the fading circle hides inside the diamond, so one still can't show both. |
+| 7 | Low | The plan still says Back shrinks. | Fixed | Item 1 marked; "Found while building" says what was built. |
+
+**Item 4 (stage the focus on the 3D map):** skipped as already there (the
+drift stops while a sheet is open; the scrim dims the map), apart from
+logic-checker #13.
+
+Checks: `tsc` and `eslint` clean; vitest 610/610; e2e 64/64 against a
+production build (7 new in `e2e/motion.e2e.ts`).

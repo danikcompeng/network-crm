@@ -141,7 +141,8 @@ function FollowUpCard({ person: p, today, onOpen, onLog }: { person: TodayPerson
   const badge = dueBadge(p.next_follow_up!, today);
   const where = [p.company, p.role].filter(Boolean).join(" · ");
   return (
-    <article className="rounded-(--radius-card) border border-line-strong bg-surface">
+    // Their page grows out of this card ("Their page" in the sheet; Motion polish).
+    <article data-expand={p.id} className="rounded-(--radius-card) border border-line-strong bg-surface">
       {/* The card opens the person sheet; Log sits beside it, never inside. */}
       <button type="button" onClick={onOpen} className="flex w-full gap-3 rounded-t-(--radius-card) px-4 pt-4 pb-2 text-left active:bg-surface-press">
         <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-press text-sm font-semibold text-ink-muted">

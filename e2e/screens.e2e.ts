@@ -446,3 +446,84 @@ test("polish screens: first use, stress, skip link", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
   await shoot(page, folder, "skip-link");
 });
+
+test("motion screens: the expand half way, the pulses, a glyph swapping", async ({ page }) => {
+  // Each moment is caught by slowing every animation 10x (DevTools), so a
+  // 250 ms motion lasts 2.5 s and a shot can land inside it.
+  const folder = "motion";
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Animation.enable");
+  const slow = (rate: number) => cdp.send("Animation.setPlaybackRate", { playbackRate: rate });
+  for (const scheme of SCHEMES) {
+    await page.emulateMedia({ colorScheme: scheme, reducedMotion: "no-preference" });
+    const shot = (name: string) => page.screenshot({ path: `docs/screenshots/${folder}/${name}-${scheme}.png` });
+
+    // The expand: Grace's row growing into her page.
+    await freshDemo(page, "/people");
+    await expect(page.getByRole("button", { name: "All 20" })).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(() => document.fonts.ready);
+    await slow(0.02);
+    await page.getByRole("link", { name: /^Grace Liu/ }).click();
+    await page.waitForTimeout(450);
+    await shot("expand-start");
+    await page.waitForTimeout(1200);
+    await shot("expand-middle");
+    await slow(1);
+    await expect(page.getByRole("heading", { level: 1, name: "Grace Liu" })).toBeVisible();
+    await page.waitForTimeout(500);
+    await shot("expand-end");
+
+    // A stage glyph swapping (talking to interviewing), half way.
+    await page.getByRole("button", { name: "Edit" }).click();
+    const edit = page.getByRole("dialog", { name: "Edit Grace Liu" });
+    await edit.getByRole("combobox", { name: "Stage" }).selectOption({ label: "Interviewing" });
+    await slow(0.02);
+    await edit.getByRole("button", { name: "Save" }).click();
+    await expect(edit).toBeHidden();
+    await expect(page.locator("main [data-leaving]")).toBeVisible();
+    // Both shapes, 80 ms into the 200 ms swap.
+    await page.evaluate(() =>
+      document.querySelector("main [data-stage-mark]")!.parentElement!.getAnimations({ subtree: true }).forEach((a) => {
+        a.pause();
+        a.currentTime = 80;
+      }),
+    );
+    await page.locator("main").getByText("Interviewing", { exact: true }).first().screenshot({ path: `docs/screenshots/${folder}/glyph-swap-${scheme}.png`, scale: "device" });
+    await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
+    await slow(1);
+    await page.waitForTimeout(600);
+
+    // A saved status pulsing.
+    await page.goto("/applications");
+    const harborview = page.getByRole("combobox", { name: "Status of Firmware Intern at Harborview Medical Devices" });
+    await page.waitForLoadState("networkidle");
+    await harborview.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await slow(0.1);
+    await harborview.selectOption("interviewing");
+    await expect(page.locator("[data-pulse]")).toBeAttached();
+    await harborview.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await page.waitForTimeout(600);
+    await shot("status-pulse");
+    await slow(1);
+    await harborview.selectOption("applied");
+    await expect(page.getByText("Saved: Harborview Medical Devices, Applied.").first()).toBeAttached();
+
+    // A log's check popping in.
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("button", { name: "Log contact with Riya Patel" }).click();
+    await page.getByRole("dialog", { name: "Log contact with Riya Patel" }).getByRole("button", { name: "Call" }).click();
+    const logged = page.getByRole("dialog", { name: "Riya Patel" });
+    await slow(0.1);
+    await expect(logged.locator("[data-logged-check]")).toBeVisible();
+    await page.waitForTimeout(1300);
+    await shot("logged-pulse");
+    await slow(1);
+    await page.waitForTimeout(800);
+    await shot("logged-end");
+    await logged.getByRole("button", { name: "Undo" }).click();
+    await expect(logged).toBeHidden();
+  }
+  await reseedDemo();
+});

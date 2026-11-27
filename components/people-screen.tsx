@@ -9,6 +9,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ContactDialog } from "@/components/contact-dialog";
+import { EXPAND_TYPE, expandFrom } from "@/components/expand";
 import { BellIcon, CloseIcon, PlusIcon, SearchIcon } from "@/components/icons";
 import { StageLabel } from "@/components/stage-chip";
 import { Button } from "@/components/ui/button";
@@ -175,7 +176,14 @@ function PersonRowLink({ person, today }: { person: ListPerson; today: string })
   return (
     <Link
       href={`/people/${person.id}`}
-      className="flex min-h-[68px] flex-col justify-center gap-1 px-4 py-3 transition-colors duration-(--motion-fast) active:bg-surface-press"
+      // The row grows into their page (Motion polish); its own surface, so its picture is the card.
+      data-expand={person.id}
+      onClick={(e) => {
+        // Not for a click that opens a new tab (nothing navigates here).
+        if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)) expandFrom(e.currentTarget);
+      }}
+      transitionTypes={[EXPAND_TYPE]}
+      className="flex min-h-[68px] flex-col justify-center gap-1 bg-surface px-4 py-3 transition-colors duration-(--motion-fast) active:bg-surface-press"
     >
       <span className="flex items-baseline justify-between gap-3">
         <span className="min-w-0 truncate font-semibold">{person.name}</span>

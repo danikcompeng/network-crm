@@ -136,6 +136,11 @@ export function NetworkMap({ people, today }: { people: MapPerson[]; today: stri
     setSheetFor(id);
   };
 
+  // The person in focus while their sheet, or the log sheet opened from it,
+  // is up: the 3D map holds still and keeps their label (plans/crm.md,
+  // Motion polish).
+  const focused = sheetFor ?? logFor?.id ?? null;
+
   const words = summaryText(summary).replace(/\.$/, "");
   const headline = day ? `On ${formatDay(day, today)}: ${words.toLowerCase()}.` : `${words}.`;
 
@@ -163,9 +168,9 @@ export function NetworkMap({ people, today }: { people: MapPerson[]; today: stri
       ) : (
         <>
           {mode === "2d" ? (
-            <MapFrame graph={graph} visible={visible} selected={sheetFor} onSelect={openFromMap} summary={headline} />
+            <MapFrame graph={graph} visible={visible} selected={focused} onSelect={openFromMap} summary={headline} />
           ) : mode === "3d" ? (
-            <MapFrame3D graph={graph} visible={visible} selected={sheetFor} onSelect={openFromMap} summary={headline} onFail={onFail} />
+            <MapFrame3D graph={graph} visible={visible} selected={focused} onSelect={openFromMap} summary={headline} onFail={onFail} />
           ) : (
             <div className="relative mt-5">
               <div className="flex aspect-square max-h-[min(60dvh,520px)] w-full items-center justify-center rounded-(--radius-card) border border-line-strong bg-space text-ink-muted">
