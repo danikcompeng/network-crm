@@ -2249,3 +2249,41 @@ deploy of e3ee93b; the 11 production checks passed first):
   one 83–100 ms gap near its end (the person's data arriving); the
   pulse has no gaps; the loop's drag has no gaps over 40 ms. The demo was
   put back after it too (checked: 12 / 5 / 1, Harborview Applied).
+
+### Quick status: a change made during a save (2026-11-27)
+
+The older bug found in the motion polish review (logic-checker #9):
+change an application's status, then change it again while the first
+save is on its way. If the first save answered and its refresh landed
+before the second change's 600 ms wait was over, the refresh cleared the
+queue's own stamps, and the second save went out with the stamp the
+screen showed when it was chosen (the one before the first save): refused
+as "changed somewhere else".
+
+**Fix** (`lib/quick-status.ts`, `components/applications-screen.tsx`):
+fresh server data now keeps a stamp from the queue's own save if the
+fresh data still has it (the row is as that save left it) and drops it
+otherwise, so a real change made elsewhere is still refused, never
+overwritten. The screen also stops showing an older choice while a newer
+one waits: a save of a choice that has since changed keeps the newer one
+on screen and says nothing, and a refresh keeps the choice of rows with a
+save still to come.
+
+**code-reviewer**: ship after fixes. My first version sent the fresh
+data's stamp instead; I changed it before the review finished, as that
+could overwrite another device's change that arrived with the refresh.
+The reviewer traced the final version through every interleaving (refresh
+before or after the save's answer, changed or deleted elsewhere, a
+refusal, offline, effect order, stamp format) and found it correct.
+
+| # | Severity | Finding | Outcome | What was done |
+|---|---|---|---|---|
+| 1 | Medium | The select jumped back to the first choice (and announced it) while the second waited; a refresh wiped another row's waiting choice. | Fixed | As above. |
+| 2 | Medium | The e2e depended on timing (could pass on the old code on a slow server). | Fixed | It holds the first save's answer until the second change is made (`page.route`); confirmed failing on the old code twice and passing on the new three times. |
+| 3 | Low | The "changed elsewhere" unit test didn't check the refusal. | Fixed | Checks the rollback and that the row is free again. |
+| 4 | Low | A unit test used a setup the screen never does (no `latestStamp`). | Fixed | It passes one, as the screen does. |
+| 5 | Low | The header named a callback that doesn't exist (`onShow`). | Fixed | Reworded. |
+| – | Tests | Refresh before the answer; row deleted elsewhere; a refused first save with a second waiting; a kept stamp through another row's refresh. | Added | Unit tests. |
+
+Checks: `tsc` and `eslint` clean; vitest 616/616; e2e 65/65 against a
+production build.

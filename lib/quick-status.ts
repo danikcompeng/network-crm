@@ -1,11 +1,18 @@
 // The one-tap status change's save queue (plans/crm.md, Feature 3): pure
 // enough to test with fake timers, no React. One queue per screen.
 //
-// - A change shows at once (the screen applies `onShow`), and is saved a
+// - A change shows at once (the screen shows it itself), and is saved a
 //   moment after the LAST change on that row, so arrowing through a
 //   keyboard-focused select saves once.
 // - One save per row at a time; a change made while one is running is
 //   saved after it, with the version stamp the first save returned.
+// - A save goes out with the stamp this queue's last save returned, if
+//   any, else the one the screen showed when you chose. Fresh server data
+//   (`reset`) keeps a stamp it confirms (the row is as our save left it)
+//   and drops one it doesn't (changed elsewhere since: refused, as it
+//   should be). It used to drop them all, so a change made while a save
+//   ran, still waiting when the refresh landed, went out with the old
+//   stamp and was refused as "changed elsewhere".
 // - A refused save (changed elsewhere) or a failed call (offline, a dropped
 //   connection: the call itself rejects) rolls the row back and says so,
 //   and the row keeps working: nothing is left "running".
@@ -22,6 +29,8 @@ export type QuickStatusOptions = {
   onSaved: (id: string, saved: { status: ApplicationStatus; applied_on: string | null; updated_at: string }) => void;
   /** A row's change didn't stick: show the server's version again. */
   onRolledBack: (id: string, message: string) => void;
+  /** The row's stamp in the screen's current data (fresh after a refresh); undefined if it's gone. */
+  latestStamp?: (id: string) => string | undefined;
   settleMs?: number;
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (handle: unknown) => void;
@@ -46,9 +55,15 @@ export class QuickStatusQueue {
     this.clearTimer = options.clearTimer ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>));
   }
 
-  /** Fresh server data arrived: its stamps are the truth now. */
+  /**
+   * Fresh server data arrived: its stamps (through `latestStamp`) are the
+   * truth now. A stamp our own save returned stays only if the fresh data
+   * still has it.
+   */
   reset() {
-    this.stamps.clear();
+    for (const [id, stamp] of this.stamps) {
+      if (this.options.latestStamp?.(id) !== stamp) this.stamps.delete(id);
+    }
   }
 
   /** Is a save waiting or running for this row? */

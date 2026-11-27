@@ -378,21 +378,34 @@ export function ApplicationRowView({
 function useQuickStatus(applications: readonly ApplicationRow[], say: (words: string, tone?: "info" | "error") => void) {
   type Override = { status: ApplicationStatus; applied_on: string | null; updated_at: string };
   const [overrides, setOverrides] = useState<Map<string, Override>>(new Map());
+  // Rows with a change not yet saved (waiting its moment, or on its way):
+  // fresh server data doesn't replace what they show.
+  const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
+  const settle = (id: string) =>
+    setPending((s) => {
+      if (!s.has(id)) return s;
+      const next = new Set(s);
+      next.delete(id);
+      return next;
+    });
   // Saves per row, for the pulse (Motion polish). Kept apart from the
   // overrides, which fresh server data resets, so a refresh never replays
   // or cuts one; cleared when the page is hidden, so none greets the next visit.
   const [pulses, setPulses] = useState<Map<string, number>>(new Map());
   useLayoutEffect(() => () => setPulses(new Map()), []);
   // Each row's latest choice: a save of an older one (changed again while
-  // it was saving) doesn't pulse.
+  // it was saving) doesn't show, pulse or say "Saved".
   const chosen = useRef(new Map<string, ApplicationStatus>());
   const sayRef = useRef(say);
   useEffect(() => {
     sayRef.current = say;
   });
   const names = useRef(new Map<string, string>());
+  // Each row's stamp in the latest server data: the queue keeps its own saved stamp through a refresh only if this confirms it.
+  const stamps = useRef(new Map<string, string>());
   useEffect(() => {
     names.current = new Map(applications.map((a) => [a.id, a.company]));
+    stamps.current = new Map(applications.map((a) => [a.id, a.updated_at]));
   }, [applications]);
 
   // Built once, after the first render (its callbacks use refs, which render mustn't touch).
@@ -401,11 +414,20 @@ function useQuickStatus(applications: readonly ApplicationRow[], say: (words: st
     queue.current = new QuickStatusQueue({
         send: (id, stamp, to) => changeStatus(id, stamp, to),
         onSaved: (id, saved) => {
+          const latest = chosen.current.get(id);
+          if (latest !== undefined && latest !== saved.status) {
+            // An older choice was saved and a newer one is on its way: keep
+            // showing the newer one (with the new stamp), and say nothing yet.
+            setOverrides((m) => new Map(m).set(id, { ...saved, status: latest }));
+            return;
+          }
+          settle(id);
           setOverrides((m) => new Map(m).set(id, saved));
-          if (chosen.current.get(id) === saved.status) setPulses((m) => new Map(m).set(id, (m.get(id) ?? 0) + 1));
+          setPulses((m) => new Map(m).set(id, (m.get(id) ?? 0) + 1));
           sayRef.current(`Saved: ${names.current.get(id) ?? "the application"}, ${APPLICATION_STATUS_LABELS[saved.status]}.`);
         },
         onRolledBack: (id, message) => {
+          settle(id);
           setOverrides((m) => {
             const next = new Map(m);
             next.delete(id);
@@ -413,14 +435,16 @@ function useQuickStatus(applications: readonly ApplicationRow[], say: (words: st
           });
           sayRef.current(message, "error");
         },
+        latestStamp: (id) => stamps.current.get(id),
       });
   }, []);
 
-  // Fresh server data replaces what this screen guessed (and its stamps).
+  // Fresh server data replaces what this screen guessed (and its stamps),
+  // except on rows with a change still to be saved.
   const [seen, setSeen] = useState(applications);
   if (seen !== applications) {
     setSeen(applications);
-    setOverrides(new Map());
+    setOverrides((m) => new Map([...m].filter(([id]) => pending.has(id))));
   }
   useEffect(() => {
     queue.current?.reset();
@@ -433,6 +457,7 @@ function useQuickStatus(applications: readonly ApplicationRow[], say: (words: st
 
   function change(a: ApplicationRow, to: ApplicationStatus) {
     chosen.current.set(a.id, to);
+    setPending((s) => (s.has(a.id) ? s : new Set(s).add(a.id)));
     setOverrides((m) => new Map(m).set(a.id, { status: to, applied_on: a.applied_on, updated_at: m.get(a.id)?.updated_at ?? a.updated_at }));
     queue.current?.change(a.id, a.updated_at, to);
   }

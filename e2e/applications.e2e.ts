@@ -53,6 +53,40 @@ test("a status changes in one tap and stays; leaving Saved dates it today", asyn
   await expect(page.getByRole("button", { name: "13 Sent" })).toBeVisible();
 });
 
+test("a second status change made while the first is saving is saved too, not refused as changed elsewhere", async ({ page }) => {
+  await freshDemo(page, "/applications");
+  const harborview = page.getByRole("combobox", { name: "Status of Firmware Intern at Harborview Medical Devices" });
+  // Hold the first save's answer (the server has already saved it) until the
+  // second change is made, then let it land at once: the refresh it brings
+  // always arrives while the second change is still waiting its moment.
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  let firstSave: "waiting" | "held" | "done" = "waiting";
+  await page.route("**/applications**", async (route) => {
+    const request = route.request();
+    if (firstSave !== "waiting" || request.method() !== "POST" || !request.headers()["next-action"]) return route.continue();
+    firstSave = "held";
+    const response = await route.fetch();
+    await held;
+    firstSave = "done";
+    await route.fulfill({ response });
+  });
+  const seen: string[] = [];
+  await harborview.selectOption("interviewing");
+  await expect.poll(() => firstSave).toBe("held");
+  await harborview.selectOption("offer");
+  release();
+  // While it settles, the select never goes back to the first choice.
+  const watch = setInterval(() => void harborview.inputValue().then((v) => seen.push(v), () => {}), 50);
+  await expect(page.getByText("Saved: Harborview Medical Devices, Offer.").first()).toBeAttached({ timeout: 10_000 });
+  clearInterval(watch);
+  expect(seen).not.toContain("interviewing");
+  await expect(page.getByText(/changed somewhere else/)).toHaveCount(0);
+  await expect(page.getByText("Saved: Harborview Medical Devices, Interviewing.")).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("combobox", { name: "Status of Firmware Intern at Harborview Medical Devices" })).toHaveValue("offer");
+});
+
 test("add, edit and delete an application", async ({ page }) => {
   await freshDemo(page, "/applications");
   await page.getByRole("button", { name: "Add", exact: true }).click();
